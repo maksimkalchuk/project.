@@ -724,7 +724,7 @@ class XSSAuditor:
         """Поиск потенциала для Stored XSS"""
         vulnerabilities = []
 
-        print("Анализ на Stored XSS потенциал...")
+        print("Анализ на Stored XSS потенциал")
 
         try:
             #формы для комментариев, сообщений, отзывов
@@ -849,10 +849,10 @@ class XSSAuditor:
         duration = time.time() - self.stats['start_time']
 
         print("\n" + "=" * 70)
-        print("РЕЗУЛЬТАТЫ XSS СКАНИРОВАНИЯ")
+        print("Результаты XSS Сканирования")
         print("=" * 70)
 
-        print(f"\nСТАТИСТИКА:")
+        print(f"\nСтатистика:")
         print(f"  Общее время: {duration:.2f} секунд")
         print(f"  Отправлено запросов: {self.stats['requests_sent']}")
         print(f"  Проверено страниц: {self.stats['pages_scanned']}")
@@ -863,14 +863,14 @@ class XSSAuditor:
             speed = self.stats['requests_sent'] / duration
             print(f"  Скорость: {speed:.1f} запросов/сек")
 
-        print(f"\nНАЙДЕННЫЕ УЯЗВИМОСТИ:")
+        print(f"\nНайденные уязвимости:")
         print(f"  Всего: {self.stats['vulnerabilities_found']}")
         print(f"  Reflected XSS: {self.stats['reflected_xss']}")
         print(f"  DOM-based XSS (потенциальные): {self.stats['dom_xss_potential']}")
         print(f"  Stored XSS (потенциальные): {self.stats['stored_xss_potential']}")
 
         if self.vulnerabilities:
-            print(f"\nКРИТИЧЕСКИЕ УЯЗВИМОСТИ:")
+            print(f"\nКритические уязвимости:")
             for i, vuln in enumerate(self.vulnerabilities[:5], 1):
                 if vuln['confidence'] == 'High':
                     vuln_type = vuln['type'].replace('Reflected XSS', 'XSS')
@@ -883,7 +883,7 @@ class XSSAuditor:
                         print(f"     URL: {vuln['url'][:80]}...")
 
         # Оценка безопасности
-        print(f"\nОЦЕНКА БЕЗОПАСНОСТИ:")
+        print(f"\nОценка Безопасности:")
         if self.stats['reflected_xss'] > 0:
             print("УРОВЕНЬ БЕЗОПАСНОСТИ: НИЗКИЙ")
             print("Обнаружены критические XSS уязвимости")
@@ -902,7 +902,7 @@ class XSSAuditor:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"xss_audit_{self.base_domain}_{timestamp}"
 
-        print(f"\nГенерация отчетов...")
+        print(f"\nГенерация отчетов")
 
         #Текстовый отчет
         txt_report = self._generate_text_xss_report(filename)
@@ -912,9 +912,9 @@ class XSSAuditor:
         if PDF_SUPPORT:
             try:
                 pdf_report = self._generate_pdf_xss_report(filename)
-                print(f"[+] PDF отчет: {pdf_report}")
+                print(f"PDF отчет: {pdf_report}")
             except Exception as e:
-                print(f"[-] Ошибка создания PDF: {e}")
+                print(f"Ошибка создания PDF: {e}")
 
         return txt_report
 
@@ -956,7 +956,7 @@ class XSSAuditor:
                 #Reflected XSS
                 reflected = [v for v in self.vulnerabilities if 'Reflected' in v.get('type', '')]
                 if reflected:
-                    f.write("\n4.1. REFLECTED XSS УЯЗВИМОСТИ\n")
+                    f.write("\n4.1. reflected XSS уязвимости\n")
                     f.write("-" * 40 + "\n")
                     for i, vuln in enumerate(reflected, 1):
                         f.write(f"\n{i}. {vuln['type']}\n")
@@ -1066,10 +1066,10 @@ def main():
 
     try:
         if args.fast:
-            print("Запуск быстрого сканирования...")
+            print("Запуск быстрого сканирования")
             scanner.xss_payloads = scanner.xss_payloads[:20]
 
-        print("Начало XSS сканирования...")
+        print("Начало XSS сканирования")
         vulnerabilities = scanner.full_xss_scan()
 
         if args.output:
@@ -1117,11 +1117,11 @@ def check_reportlab():
         return True
     except ImportError:
         print("[!] Библиотека 'reportlab' не установлена")
-        print("[*] Пытаюсь установить...")
+        print("[*] Пытаюсь установить")
         try:
             import subprocess
             subprocess.check_call([sys.executable, "-m", "pip", "install", "reportlab"])
-            print("[+] Установка успешна!")
+            print("[+] Установка успешна")
             return True
         except:
             print("[-] Не удалось установить reportlab")
@@ -1184,8 +1184,8 @@ class SimpleIDORBruteforceScanner:
 
         #Алфавит для генерации комбинаций
         self.alphabet = string.ascii_letters + string.digits  # a-z, A-Z, 0-9
-        print(f"[+] Алфавит содержит {len(self.alphabet)} символов")
-        print(f"[+] Всего возможных комбинаций из 6 символов: {len(self.alphabet) ** 6:,}")
+        print(f"Алфавит содержит {len(self.alphabet)} символов")
+        print(f"Всего возможных комбинаций из 6 символов: {len(self.alphabet) ** 6:,}")
 
         #Ключевые слова для определения успешного доступа
         self.success_keywords = [
@@ -1313,7 +1313,7 @@ class SimpleIDORBruteforceScanner:
                 base_path += '/'
             return f"{self.scheme}://{self.base_domain}{base_path}"
         else:
-            #Используем полный путь с добавлением /
+            #полный путь с добавлением /
             if not path.endswith('/'):
                 path += '/'
             return f"{self.scheme}://{self.base_domain}{path}"
@@ -1331,7 +1331,7 @@ class SimpleIDORBruteforceScanner:
 
             #рогресс каждые 1000 комбинаций
             if len(combinations) % 1000 == 0:
-                print(f"[*] Сгенерировано: {len(combinations)}/{count}")
+                print(f"Сгенерировано: {len(combinations)}/{count}")
 
         return list(combinations)
 
@@ -1361,7 +1361,7 @@ class SimpleIDORBruteforceScanner:
         combinations.update(letter_patterns)
 
         #Комбинации на основе слов
-        print("[*] Комбинации на основе слов...")
+        print("[*] Комбинации на основе слов")
         words = ['admin', 'user', 'test', 'guest', 'demo', 'root', 'super', 'system']
         for word in words:
             #дополнение слова до 6 символов
@@ -1572,8 +1572,7 @@ class SimpleIDORBruteforceScanner:
                 self.vulnerabilities.append(vulnerability)
                 self.stats['vulnerabilities_found'] += 1
 
-                print(f"\nНАЙДЕНА УЯЗВИМОСТЬ IDOR")
-                print(f"    URL: {test_url}")
+                print(f"\nНайдена уязвимость IDOR")
                 print(f"    Комбинация: {combo}")
                 print(f"    Статус код: {result.get('status_code')}")
                 print(f"    Длина контента: {result.get('content_length')}")
@@ -1673,7 +1672,7 @@ class SimpleIDORBruteforceScanner:
         duration = time.time() - self.stats['start_time']
 
         print("\n" + "=" * 60)
-        print("СТАТИСТИКА СКАНИРОВАНИЯ IDOR (BRUTEFORCE)")
+        print("Статистика сканирования IDOR")
         print("=" * 60)
         print(f"Общее время: {duration:.2f} секунд")
         print(f"Скорость: {self.stats['requests_sent'] / max(duration, 1):.1f} запросов/сек")
@@ -1688,7 +1687,7 @@ class SimpleIDORBruteforceScanner:
         print("-" * 60)
 
         if self.vulnerabilities:
-            print("НАЙДЕННЫЕ УЯЗВИМОСТИ:")
+            print("Найденные уязвимости:")
             for i, vuln in enumerate(self.vulnerabilities[:10], 1):
                 print(f"{i}. {vuln['url']}")
                 print(f"   Комбинация: {vuln['combo']}")
@@ -1701,12 +1700,12 @@ class SimpleIDORBruteforceScanner:
     def _setup_russian_fonts(self):
         """Настройка русских шрифтов для PDF"""
         try:
-            # Пытаемся использовать стандартный шрифт с поддержкой кириллицы
+            #Попытка использовать стандартный шрифт с поддержкой кириллицы
             pdfmetrics.registerFont(TTFont('DejaVu', 'DejaVuSans.ttf'))
             return True
         except:
             try:
-                # Альтернативный вариант
+                #Альтернатива
                 font_paths = [
                     '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
                     '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
@@ -1722,20 +1721,20 @@ class SimpleIDORBruteforceScanner:
                         return True
 
                 # Если не нашли шрифты, используем встроенные
-                print("[!] Не удалось найти русские шрифты, используем стандартные")
+                print("Не удалось найти русские шрифты, используем стандартные")
                 return False
             except:
                 return False
 
     def generate_pdf_report(self, filename="idor_report.pdf"):
         """Генерирует PDF отчет с поддержкой русского языка"""
-        print(f"\n[*] Генерация PDF отчета: {filename}")
+        print(f"\nГенерация PDF отчета: {filename}")
 
         try:
-            # Настройка русских шрифтов
+            #Настройка русских шрифтов
             fonts_setup = self._setup_russian_fonts()
 
-            # Создаем документ
+            #документ
             doc = SimpleDocTemplate(
                 filename,
                 pagesize=A4,
@@ -1745,13 +1744,13 @@ class SimpleIDORBruteforceScanner:
                 bottomMargin=72
             )
 
-            # Стили с учетом русского языка
+            #Стили с учетом русского языка
             styles = getSampleStyleSheet()
 
-            # Определяем имя шрифта для использования
+            #имя шрифта для использования
             font_name = 'RussianFont' if fonts_setup else 'Helvetica'
 
-            # Кастомные стили с русским шрифтом
+            #Кастомные стили с русским шрифтом
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
@@ -1782,7 +1781,7 @@ class SimpleIDORBruteforceScanner:
                 textColor=colors.HexColor('#34495E')
             )
 
-            # Стиль для обычного текста
+            #Стиль для обычного текста
             normal_style = ParagraphStyle(
                 'NormalRussian',
                 parent=styles['Normal'],
@@ -1791,7 +1790,7 @@ class SimpleIDORBruteforceScanner:
                 leading=14
             )
 
-            # Стиль для таблиц
+            #Стиль для таблиц
             table_style = ParagraphStyle(
                 'TableRussian',
                 parent=styles['Normal'],
@@ -1800,14 +1799,14 @@ class SimpleIDORBruteforceScanner:
                 leading=12
             )
 
-            # Содержимое документа
+            #Содержимое документа
             story = []
 
-            # Заголовок
-            story.append(Paragraph("ОТЧЕТ ОБ АУДИТЕ IDOR УЯЗВИМОСТЕЙ (BRUTEFORCE)", title_style))
+            #Заголовок
+            story.append(Paragraph("Отчет об аудите IDOR уязвимостей", title_style))
             story.append(Spacer(1, 20))
 
-            # Информация о сканировании
+            #Информация о сканировании
             story.append(Paragraph("Информация о сканировании", heading_style))
 
             scan_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -1825,7 +1824,7 @@ class SimpleIDORBruteforceScanner:
                 ['Найдено уязвимостей', str(self.stats['vulnerabilities_found'])]
             ]
 
-            # Создаем таблицу с данными
+            #таблица с данными
             table_data = []
             for row in info_data:
                 table_row = []
@@ -1973,22 +1972,16 @@ class SimpleIDORBruteforceScanner:
 
             story.append(Spacer(1, 20))
 
-            # Подпись
-            story.append(Paragraph("Отчет сгенерирован автоматически", normal_style))
-            story.append(Paragraph(f"Дата: {scan_date}", normal_style))
-            story.append(Paragraph("Автор: Кальчук Максим Андреевич", normal_style))
-            story.append(Paragraph("ГАОУ Школа №548, Москва", normal_style))
-
             # Генерируем PDF
             doc.build(story)
-            print(f"[+] PDF отчет успешно создан: {filename}")
+            print(f"PDF отчет успешно создан: {filename}")
 
             if not fonts_setup:
-                print("[!] Внимание: Русский текст может отображаться некорректно в PDF")
-                print("[!] Для правильного отображения установите шрифты с поддержкой кириллицы")
+                print("Внимание: Русский текст может отображаться некорректно в PDF")
+                print("Для правильного отображения установите шрифты с поддержкой кириллицы")
 
         except Exception as e:
-            print(f"[-] Ошибка создания PDF отчета: {e}")
+            print(f"Ошибка создания PDF отчета: {e}")
             import traceback
             traceback.print_exc()
             # Создаем текстовый отчет как запасной вариант
@@ -2003,7 +1996,7 @@ class SimpleIDORBruteforceScanner:
         report_lines = []
 
         report_lines.append("=" * 80)
-        report_lines.append("ОТЧЕТ ОБ АУДИТЕ IDOR УЯЗВИМОСТЕЙ (BRUTEFORCE)")
+        report_lines.append("Отчет об аудите IDOR уязвимостей")
         report_lines.append("=" * 80)
         report_lines.append(f"Цель: {self.target_url}")
         report_lines.append(f"Дата сканирования: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -2015,7 +2008,7 @@ class SimpleIDORBruteforceScanner:
         report_lines.append("")
 
         if self.vulnerabilities:
-            report_lines.append("НАЙДЕННЫЕ УЯЗВИМОСТИ IDOR")
+            report_lines.append("Найденные уязвимости IDOR")
             report_lines.append("-" * 80)
 
             for i, vuln in enumerate(self.vulnerabilities, 1):
@@ -2028,9 +2021,9 @@ class SimpleIDORBruteforceScanner:
                 report_lines.append(f"   Доказательства: {vuln.get('evidence', 'Нет')}")
                 report_lines.append("")
         else:
-            report_lines.append("УЯЗВИМОСТИ НЕ НАЙДЕНЫ")
+            report_lines.append("Уязвимости не найдены")
             report_lines.append("")
-        report_lines.append("СТАТИСТИКА СКАНИРОВАНИЯ")
+        report_lines.append("Статистика сканирования")
         report_lines.append("-" * 80)
         duration = time.time() - self.stats['start_time']
         report_lines.append(f"Общее время сканирования: {duration:.2f} секунд")
@@ -2042,31 +2035,27 @@ class SimpleIDORBruteforceScanner:
             report_lines.append(f"Покрытие комбинаций: {percentage:.10f}%")
 
         report_lines.append("")
-        report_lines.append("РЕКОМЕНДАЦИИ ПО УСТРАНЕНИЮ IDOR УЯЗВИМОСТЕЙ")
+        report_lines.append("Рекомендации по устранению IDOR")
         report_lines.append("-" * 80)
-        report_lines.append("1. ЗАЩИТА ОТ ПЕРЕБОРА (BRUTEFORCE):")
-        report_lines.append("   • Внедрите rate limiting (ограничение запросов)")
+        report_lines.append("1. ЗАЩИТА ОТ ПЕРЕБОРА:")
         report_lines.append("   • Используйте CAPTCHA для подозрительных запросов")
         report_lines.append("   • Добавьте задержки между попытками доступа")
         report_lines.append("   • Блокируйте IP-адреса после множества неудачных попыток")
         report_lines.append("")
         report_lines.append("2. БЕЗОПАСНЫЕ ИДЕНТИФИКАТОРЫ:")
-        report_lines.append("   • Используйте UUID/GUID вместо последовательных чисел")
-        report_lines.append("   • Минимальная длина идентификатора - 16+ случайных символов")
+        report_lines.append("   • Минимальная длина идентификатора -16+ случайных символов")
         report_lines.append("   • Регулярно меняйте идентификаторы сессий")
-        report_lines.append("   • Не используйте предсказуемые паттерны (user1, user2)")
+        report_lines.append("   • Не используйте предсказуемые паттерны")
         report_lines.append("")
         report_lines.append("3. КОНТРОЛЬ ДОСТУПА:")
         report_lines.append("   • Проверяйте права доступа для КАЖДОГО запроса")
         report_lines.append("   • Внедрите систему RBAC (Role-Based Access Control)")
         report_lines.append("   • Используйте токены с ограниченным сроком действия")
-        report_lines.append("   • Реализуйте проверку на уровне приложения и БД")
         report_lines.append("")
         report_lines.append("4. МОНИТОРИНГ И АУДИТ:")
-        report_lines.append("   • Ведите логи всех запросов к защищенным ресурсам")
         report_lines.append("   • Настройте оповещения о подозрительной активности")
         report_lines.append("   • Регулярно проводите тестирование на проникновение")
-        report_lines.append("   • Используйте системы обнаружения вторжений (IDS)")
+        report_lines.append("   • Используйте системы обнаружения вторжений")
         report_lines.append("")
         report_lines.append("=" * 80)
         report_lines.append("Конец отчета")
@@ -2076,7 +2065,7 @@ class SimpleIDORBruteforceScanner:
         with open(filename, 'w', encoding='utf-8') as f:
             f.write('\n'.join(report_lines))
 
-        print(f"\n[+] Текстовый отчет сохранен в файл: {filename}")
+        print(f"\nТекстовый отчет сохранен в файл: {filename}")
 
         print("\n" + "=" * 60)
         print("КРАТКИЕ РЕЗУЛЬТАТЫ:")
@@ -2110,8 +2099,8 @@ def main():
         description='IDOR Bruteforce Scanner - Перебор 6-символьных комбинаций',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-  • Всего комбинаций: 62^6 = 56.8 МИЛЛИАРДОВ
-  • Полный перебор НЕВОЗМОЖЕН
+  • Всего комбинаций: 62^6 = 56.8 миллиардов
+  • Полный перебор слишком долгий
   • Используйте стратегии тестирования
         """
     )
@@ -2138,7 +2127,7 @@ def main():
         try:
             headers_dict = json.loads(args.headers)
         except json.JSONDecodeError:
-            print("[-] Ошибка парсинга заголовков. Убедитесь, что это валидный JSON.")
+            print("Ошибка парсинга заголовков. Убедитесь, что это валидный JSON.")
             return
     scanner = SimpleIDORBruteforceScanner(
         target_url=args.url,
@@ -2152,15 +2141,15 @@ def main():
         vulnerabilities = scanner.scan()
         pdf_file, txt_file = scanner.generate_report(args.output)
 
-        print(f"\n[+] Отчеты успешно созданы:")
+        print(f"\nОтчеты успешно созданы:")
         print(f"    PDF отчет: {pdf_file}")
         print(f"    Текстовый отчет: {txt_file}")
 
     except KeyboardInterrupt:
-        print("\n\n[-] Сканирование прервано пользователем")
+        print("\n\nСканирование прервано пользователем")
         scanner.generate_report(args.output)
     except Exception as e:
-        print(f"\n[-] Критическая ошибка: {e}")
+        print(f"\nКритическая ошибка: {e}")
         import traceback
         traceback.print_exc()
 
