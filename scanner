@@ -241,7 +241,7 @@ class XSSAuditor:
             main_response = self._safe_request('GET', self.target_url)
             if not main_response or main_response.status_code != 200:
                 print(
-                    f"[-] Ошибка доступа к сайту (код: {main_response.status_code if main_response else 'нет ответа'})")
+                    f"Ошибка доступа к сайту (код: {main_response.status_code if main_response else 'нет ответа'})")
                 return self.vulnerabilities
 
             self.stats['pages_scanned'] += 1
@@ -287,25 +287,10 @@ class XSSAuditor:
             print(f"Ошибка при сканировании: {e}")
             return self.vulnerabilities
 
-        # Вывод результатов
+        #Вывод результатов
         self._print_results_summary()
 
         return self.vulnerabilities
-    def _safe_request(self, method, url, **kwargs):
-        """Безопасный HTTP запрос с ограничением скорости"""
-        try:
-            with self.lock:
-                self.stats['requests_sent'] += 1
-
-            response = self.session.request(
-                method, url,
-                timeout=15,
-                allow_redirects=True,
-                **kwargs
-            )
-
-            return response
-
     def _analyze_page(self, html_content):
         """Анализ HTML страницы"""
         info = {
@@ -318,12 +303,12 @@ class XSSAuditor:
         }
 
         try:
-            # Заголовок
+            #Заголовок
             title_match = re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
             if title_match:
                 info['title'] = title_match.group(1).strip()[:100]
 
-            # Подсчет элементов
+            #Подсчет элементов
             info['forms_count'] = len(re.findall(r'<form', html_content, re.IGNORECASE))
             info['inputs_count'] = len(re.findall(r'<input', html_content, re.IGNORECASE))
             info['links_count'] = len(re.findall(r'<a [^>]*href=', html_content, re.IGNORECASE))
@@ -1045,6 +1030,8 @@ class XSSAuditor:
 
 def main():
     """Основная функция для запуска XSS-сканера"""
+    parser = argparse.ArgumentParser(description='XSS-сканер')
+
     parser.add_argument('url', help='URL сайта для XSS сканирования')
     parser.add_argument('--threads', type=int, default=10,
                         help='Количество потоков (по умолчанию: 10)')
@@ -1059,7 +1046,7 @@ def main():
 
     #Проверка URL
     if not args.url.startswith(('http://', 'https://')):
-        print("[!] Укажите полный URL (http:// или https://)")
+        print("Укажите полный URL (http:// или https://)")
         return
 
     #Парсинг cookies
@@ -1070,20 +1057,36 @@ def main():
             if '=' in cookie:
                 name, value = cookie.split('=', 1)
                 cookies_dict[name] = value
-    #Создание и запуск сканера
+
     scanner = XSSAuditor(
         target_url=args.url,
         max_threads=args.threads,
         cookies=cookies_dict
     )
+
+    try:
+        if args.fast:
+            print("Запуск быстрого сканирования...")
+            scanner.xss_payloads = scanner.xss_payloads[:20]
+
+        print("Начало XSS сканирования...")
+        vulnerabilities = scanner.full_xss_scan()
+
+        if args.output:
+            scanner.generate_xss_report(args.output)
+        else:
+            scanner.generate_xss_report()
+
+    except KeyboardInterrupt:
+        print("Сканирование прервано пользователем")
+    except Exception as e:
+        print(f"Критическая ошибка: {e}")
+
+
 if __name__ == "__main__":
     main()
-#!/usr/bin/env python3
-"""
-IDOR Bruteforce Scanner с PDF отчетом
-Автор: Кальчук Максим Андреевич
-Школа №548, Москва
-"""
+
+
 
 import requests
 import re
@@ -1101,7 +1104,7 @@ from datetime import datetime
 import os
 
 
-# Проверка и установка reportlab
+#Установка библиотек для создания отчетов
 def check_reportlab():
     """Проверяет наличие reportlab, устанавливает если нет"""
     try:
@@ -1126,7 +1129,7 @@ def check_reportlab():
             return False
 
 
-# Проверяем reportlab
+#Проверка
 if not check_reportlab():
     print("[*] Будут создаваться только текстовые отчеты")
 
@@ -1141,15 +1144,10 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 class SimpleIDORBruteforceScanner:
     def __init__(self, target_url, max_threads=50, cookies=None, headers=None):
-        """
-        Инициализация сканера
-
-        Args:
-            target_url (str): Целевой URL для сканирования
-            max_threads (int): Максимальное количество потоков
-            cookies (dict): Куки для аутентификации
-            headers (dict): Заголовки HTTP
-        """
+        """target_url (str): Целевой URL для сканирования
+        max_threads (int): Максимальное количество потоков
+        cookies (dict): Куки для аутентификации
+        headers (dict): Заголовки HTTP """
         self.target_url = target_url.rstrip('/')
         parsed_url = urlparse(target_url)
         self.base_domain = parsed_url.netloc
@@ -1157,7 +1155,7 @@ class SimpleIDORBruteforceScanner:
         self.max_threads = max_threads
         self.session = requests.Session()
 
-        # Настройка сессии
+        #Настройка сессии
         if cookies:
             self.session.cookies.update(cookies)
 
@@ -1172,10 +1170,10 @@ class SimpleIDORBruteforceScanner:
             default_headers.update(headers)
         self.session.headers.update(default_headers)
 
-        # Результаты сканирования
+        #Результаты сканирования
         self.vulnerabilities = []
 
-        # Статистика
+        #Статистика
         self.stats = {
             'requests_sent': 0,
             'vulnerabilities_found': 0,
@@ -1184,12 +1182,12 @@ class SimpleIDORBruteforceScanner:
             'total_combinations': 0
         }
 
-        # Алфавит для генерации комбинаций
+        #Алфавит для генерации комбинаций
         self.alphabet = string.ascii_letters + string.digits  # a-z, A-Z, 0-9
         print(f"[+] Алфавит содержит {len(self.alphabet)} символов")
         print(f"[+] Всего возможных комбинаций из 6 символов: {len(self.alphabet) ** 6:,}")
 
-        # Ключевые слова для определения успешного доступа
+        #Ключевые слова для определения успешного доступа
         self.success_keywords = [
             'user', 'profile', 'account', 'email', 'phone', 'address',
             'name', 'data', 'info', 'details', 'settings', 'password',
@@ -1197,7 +1195,7 @@ class SimpleIDORBruteforceScanner:
             'персональные данные', 'личный кабинет', 'профиль', 'аккаунт'
         ]
 
-        # Ключевые слова для определения ошибок
+        #Ключевые слова для определения ошибок
         self.error_keywords = [
             '404', 'not found', 'error', 'page not found',
             'does not exist', 'invalid', 'forbidden', 'unauthorized',
@@ -1206,27 +1204,26 @@ class SimpleIDORBruteforceScanner:
 
     def scan(self):
         """Основной метод сканирования"""
-        print(f"[+] Начало сканирования IDOR: {self.target_url}")
-        print(f"[+] Максимальное количество потоков: {self.max_threads}")
+        print(f"Начало сканирования IDOR: {self.target_url}")
+        print(f"Максимальное количество потоков: {self.max_threads}")
         print("-" * 60)
 
         try:
-            # Шаг 1: Получить базовый путь для брутфорса
-            print("[*] Этап 1: Определение базового пути для брутфорса...")
+            #Получить базовый путь для брутфорса
+            print("Определение базового пути для брутфорса")
             base_url = self._get_base_url_for_bruteforce()
-            print(f"[+] Базовый URL для брутфорса: {base_url}")
+            print(f"Базовый URL для брутфорса: {base_url}")
 
-            # Шаг 2: Рассчитать общее количество комбинаций
-            print("[*] Этап 2: Расчет общего количества комбинаций...")
+            #Рассчитать общее количество комбинаций
+            print("Расчет общего количества комбинаций")
             total_combinations = len(self.alphabet) ** 6
             self.stats['total_combinations'] = total_combinations
-            print(f"[+] Всего возможных комбинаций: {total_combinations:,}")
-            print(f"[+] Полный перебор займет НЕВОЗМОЖНО много времени!")
+            print(f"Всего возможных комбинаций: {total_combinations:,}")
+            print(f"Полный перебор займет много времени")
 
-            # Шаг 3: Генерация и тестирование комбинаций
-            print("[*] Этап 3: Генерация и тестирование комбинаций...")
+            #Генерация и тестирование комбинаций
+            print("[*] Этап 3: Генерация и тестирование комбинаций")
 
-            # Предлагаем стратегии
             strategy = self._ask_scan_strategy()
 
             if strategy == 'random_small':
@@ -1238,18 +1235,17 @@ class SimpleIDORBruteforceScanner:
             elif strategy == 'patterns':
                 self._bruteforce_patterns(base_url)
             elif strategy == 'incremental':
-                self._bruteforce_incremental(base_url, limit=10000)
+                self._bruteforce_incremental(base_url, limit=500000)
             elif strategy == 'custom':
                 self._bruteforce_custom(base_url)
 
         except KeyboardInterrupt:
-            print("\n\n[-] Сканирование прервано пользователем")
+            print("\n\n Сканирование прервано пользователем")
         except Exception as e:
-            print(f"[-] Ошибка при сканировании: {e}")
+            print(f"Ошибка при сканировании: {e}")
             import traceback
             traceback.print_exc()
 
-        # Вывод статистики
         self._print_statistics()
 
         return self.vulnerabilities
@@ -1257,19 +1253,17 @@ class SimpleIDORBruteforceScanner:
     def _ask_scan_strategy(self):
         """Спросить пользователя о стратегии сканирования"""
         print("\n" + "=" * 60)
-        print("ВНИМАНИЕ: Полный перебор 56.8 миллиардов комбинаций НЕВОЗМОЖЕН!")
         print("Выберите стратегию сканирования:")
         print("=" * 60)
-        print("1. Случайная выборка (1,000 комбинаций) - БЫСТРО")
-        print("2. Случайная выборка (10,000 комбинаций) - СРЕДНЕ")
-        print("3. Случайная выборка (50,000 комбинаций) - МЕДЛЕННО")
-        print("4. Перебор по паттернам (умные комбинации)")
+        print("1. Случайная выборка (1,000 комбинаций) - быстро")
+        print("2. Случайная выборка (10,000 комбинаций) - средне")
+        print("3. Случайная выборка (50,000 комбинаций) - медленно")
+        print("4. Перебор по паттернам")
         print("5. Последовательный перебор (первые 10,000)")
         print("6. Ввести количество комбинаций вручную")
-
         while True:
             try:
-                choice = input("\nВаш выбор (1-6): ").strip()
+                choice=input("\nВаш выбор (1-6): ").strip()
 
                 if choice == '1':
                     return 'random_small'
@@ -1294,25 +1288,24 @@ class SimpleIDORBruteforceScanner:
         path = parsed.path
 
         if not path or path == '/':
-            # Если путь корневой, используем его
+            #Если путь корневой, использовать его
             return f"{self.scheme}://{self.base_domain}/"
 
-        # Разбиваем путь на части
+        #разбиение пути на части
         parts = [p for p in path.strip('/').split('/') if p]
-
         if not parts:
             return f"{self.scheme}://{self.base_domain}/"
 
-        # Проверяем, содержит ли последняя часть цифры или похожа на ID
+        #Содержит ли последняя часть цифры или похожа на ID
         last_part = parts[-1]
 
-        # Если последняя часть похожа на ID, удаляем её
+        #Если последняя часть похожа на ID нужно удалить её
         if (last_part.isdigit() or
-                re.match(r'^[a-f0-9]{32}$', last_part, re.I) or  # Хэш
-                re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-', last_part, re.I) or  # UUID
-                len(last_part) <= 10 and re.match(r'^[a-zA-Z0-9]+$', last_part)):  # Короткий ID
+                re.match(r'^[a-f0-9]{32}$', last_part, re.I) or
+                re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-', last_part, re.I) or
+                len(last_part) <= 10 and re.match(r'^[a-zA-Z0-9]+$', last_part)):
 
-            # Удаляем последнюю часть (предполагаем, что это ID)
+            #Удаление последней части (предпологая что это ID)
             base_path = '/' + '/'.join(parts[:-1])
             if base_path == '':
                 base_path = '/'
@@ -1320,7 +1313,7 @@ class SimpleIDORBruteforceScanner:
                 base_path += '/'
             return f"{self.scheme}://{self.base_domain}{base_path}"
         else:
-            # Используем полный путь с добавлением слеша
+            #Используем полный путь с добавлением /
             if not path.endswith('/'):
                 path += '/'
             return f"{self.scheme}://{self.base_domain}{path}"
@@ -1329,14 +1322,14 @@ class SimpleIDORBruteforceScanner:
         """Генерация случайных комбинаций"""
         combinations = set()
 
-        print(f"[*] Генерация {count} случайных комбинаций...")
+        print(f"Генерация {count} случайных комбинаций")
 
         while len(combinations) < count:
-            # Генерируем случайную комбинацию из 6 символов
+            #Генерация случайной комбинации из 6 символов
             combo = ''.join(random.choices(self.alphabet, k=6))
             combinations.add(combo)
 
-            # Показываем прогресс каждые 1000 комбинаций
+            #рогресс каждые 1000 комбинаций
             if len(combinations) % 1000 == 0:
                 print(f"[*] Сгенерировано: {len(combinations)}/{count}")
 
@@ -1346,52 +1339,52 @@ class SimpleIDORBruteforceScanner:
         """Генерация комбинаций по паттернам"""
         combinations = set()
 
-        print("[*] Генерация умных комбинаций по паттернам...")
+        print("Генерация умных комбинаций по паттернам")
 
-        # 1. Числовые комбинации
-        print("[*] Числовые паттерны...")
+        #Числовые комбинации
+        print("Числовые паттерны")
         numeric_patterns = [
             '000000', '000001', '000010', '000100', '001000', '010000', '100000',
-            '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999',
+            '111111', '222222','333333', '444444', '555555', '666666', '777777', '888888', '999999',
             '123456', '654321', '123123', '321321', '101010', '010101',
-            '000111', '111000', '222333', '333222',
+            '000111', '111000', '222333','333222',
         ]
         combinations.update(numeric_patterns)
 
-        # 2. Буквенные комбинации
+        #Буквенные комбинации
         print("[*] Буквенные паттерны...")
         letter_patterns = [
-            'aaaaaa', 'AAAAAA', 'bbbbbb', 'BBBBBB', 'cccccc', 'CCCCCC',
+            'aaaaaa','AAAAAA', 'bbbbbb', 'BBBBBB', 'cccccc', 'CCCCCC',
             'abcdef', 'ABCDEF', 'fedcba', 'FEDCBA',
-            'abc123', 'ABC123', '123abc', '123ABC',
+            'abc123', 'ABC123', '123abc','123ABC',
         ]
         combinations.update(letter_patterns)
 
-        # 3. Комбинации на основе слов
+        #Комбинации на основе слов
         print("[*] Комбинации на основе слов...")
         words = ['admin', 'user', 'test', 'guest', 'demo', 'root', 'super', 'system']
         for word in words:
-            # Дополняем слово до 6 символов
+            #дополнение слова до 6 символов
             if len(word) < 6:
-                # Добавляем нули
+                #добавление нулей
                 padded_zero = word + '0' * (6 - len(word))
                 combinations.add(padded_zero)
                 combinations.add(padded_zero.upper())
 
-                # Добавляем единицы
+                #Добавление единицы
                 padded_one = word + '1' * (6 - len(word))
                 combinations.add(padded_one)
                 combinations.add(padded_one.upper())
 
-            # Добавляем цифры в конце
+            #Добавление цифр в конце
             for i in range(10):
                 if len(word) <= 5:
                     combo = word + str(i) * (6 - len(word))
                     combinations.add(combo)
                     combinations.add(combo.upper())
 
-        # 4. Популярные пароли/идентификаторы
-        print("[*] Популярные идентификаторы...")
+        #Популярные идентификаторы
+        print("Популярные идентификаторы")
         popular = [
             'user01', 'user02', 'user03', 'user04', 'user05',
             'admin1', 'admin2', 'admin3', 'admin4', 'admin5',
@@ -1401,28 +1394,27 @@ class SimpleIDORBruteforceScanner:
         ]
         combinations.update(popular)
 
-        # 5. Случайные комбинации
-        print("[*] Добавление случайных комбинаций...")
+        #Случайные комбинации
+        print("Добавление случайных комбинаций")
         random_combos = self._generate_random_combinations(1000)
         combinations.update(random_combos)
-
         return list(combinations)
 
     def _generate_incremental_combinations(self, limit=10000):
         """Генерация последовательных комбинаций"""
         combinations = []
 
-        print(f"[*] Генерация первых {limit} последовательных комбинаций...")
+        print(f"Генерация первых {limit} последовательных комбинаций")
 
-        # Генерируем комбинации по порядку
+        #Генерация комбинации по порядку
         for i in range(min(limit, len(self.alphabet) ** 6)):
             combo = self._index_to_combo(i)
             if combo:
                 combinations.append(combo)
 
-            # Показываем прогресс
+            #прогресс
             if i % 1000 == 0 and i > 0:
-                print(f"[*] Сгенерировано: {i}/{limit}")
+                print(f"Сгенерировано: {i}/{limit}")
 
         return combinations
 
@@ -1440,31 +1432,31 @@ class SimpleIDORBruteforceScanner:
         return ''.join(reversed(combo))
 
     def _bruteforce_random(self, base_url, sample_size):
-        """Брутфорс случайной выборки"""
+        """Случайный брутфорс"""
         combinations = self._generate_random_combinations(sample_size)
-        print(f"[*] Начинаем тестирование {len(combinations)} случайных комбинаций...")
+        print(f"Начинаем тестирование {len(combinations)} случайных комбинаций")
         self._test_combinations(base_url, combinations)
 
     def _bruteforce_patterns(self, base_url):
         """Брутфорс по паттернам"""
         combinations = self._generate_pattern_combinations()
-        print(f"[*] Начинаем тестирование {len(combinations)} комбинаций по паттернам...")
+        print(f"Начинаем тестирование {len(combinations)} комбинаций по паттернам")
         self._test_combinations(base_url, combinations)
 
     def _bruteforce_incremental(self, base_url, limit):
         """Последовательный брутфорс"""
         combinations = self._generate_incremental_combinations(limit)
-        print(f"[*] Начинаем тестирование {len(combinations)} последовательных комбинаций...")
+        print(f"Начинаем тестирование {len(combinations)} последовательных комбинаций")
         self._test_combinations(base_url, combinations)
 
     def _bruteforce_custom(self, base_url):
         """Кастомный брутфорс"""
         while True:
             try:
-                count = int(input("Введите количество комбинаций для тестирования (1-100000): "))
-                if 1 <= count <= 100000:
+                count = int(input("Введите количество комбинаций для тестирования (1-500000): "))
+                if 1 <= count <= 500000:
                     break
-                print("Пожалуйста, введите число от 1 до 100000")
+                print("Пожалуйста, введите число от 1 до 500000")
             except ValueError:
                 print("Пожалуйста, введите число")
             except KeyboardInterrupt:
@@ -1477,37 +1469,37 @@ class SimpleIDORBruteforceScanner:
         else:
             combinations = self._generate_random_combinations(count)
 
-        print(f"[*] Начинаем тестирование {len(combinations)} комбинаций...")
+        print(f"Начинаем тестирование {len(combinations)} комбинаций")
         self._test_combinations(base_url, combinations)
 
     def _test_combinations(self, base_url, combinations):
         """Тестирование комбинаций"""
         total = len(combinations)
-        print(f"[*] Всего комбинаций для тестирования: {total}")
+        print(f"Всего комбинаций для тестирования: {total}")
 
-        # Используем многопоточность
+        #многопоточность
         with ThreadPoolExecutor(max_workers=min(self.max_threads, total)) as executor:
             futures = {}
             batch_size = 100
 
-            # Разбиваем на батчи для лучшего отображения прогресса
+            #Разбивание на батчи для лучшего отображения прогресса
             for i in range(0, total, batch_size):
                 batch = combinations[i:i + batch_size]
 
-                # Создаем задачи для батча
+                #Создание задач для батча
                 for combo in batch:
                     test_url = f"{base_url}{combo}"
                     future = executor.submit(self._test_single_url, test_url, combo)
                     futures[future] = (test_url, combo)
 
-                # Ждем завершения батча
+                #завершение батча
                 completed_in_batch = 0
                 for future in as_completed(list(futures.keys())):
                     self._process_future_result(future, futures[future])
                     del futures[future]
                     completed_in_batch += 1
 
-                # Показываем прогресс
+                #прогресс
                 tested_so_far = i + len(batch)
                 print(f"[*] Прогресс: {tested_so_far}/{total} ({tested_so_far / total * 100:.1f}%)")
 
@@ -1516,7 +1508,7 @@ class SimpleIDORBruteforceScanner:
         try:
             self.stats['requests_sent'] += 1
 
-            # Отправляем запрос
+            #Отправление запроса
             response = self.session.get(
                 url,
                 timeout=5,
@@ -1563,7 +1555,7 @@ class SimpleIDORBruteforceScanner:
             result = future.result(timeout=10)
             self.stats['combinations_tested'] += 1
 
-            # Проверяем, является ли ответ уязвимостью
+            #является ли ответ уязвимостью
             if self._is_vulnerable_response(result):
                 vulnerability = {
                     'url': test_url,
@@ -1580,7 +1572,7 @@ class SimpleIDORBruteforceScanner:
                 self.vulnerabilities.append(vulnerability)
                 self.stats['vulnerabilities_found'] += 1
 
-                print(f"\n[!] НАЙДЕНА УЯЗВИМОСТЬ IDOR!")
+                print(f"\nНАЙДЕНА УЯЗВИМОСТЬ IDOR")
                 print(f"    URL: {test_url}")
                 print(f"    Комбинация: {combo}")
                 print(f"    Статус код: {result.get('status_code')}")
@@ -1596,22 +1588,22 @@ class SimpleIDORBruteforceScanner:
 
         status_code = result.get('status_code')
 
-        # Пропускаем явные ошибки
+        #Пропуск ошибок
         if status_code in [404, 403, 500, 401, 400]:
             return False
 
-        # Пропускаем редиректы на ошибки
+        #Пропуск редиректов на ошибки
         if status_code in [301, 302, 303, 307, 308]:
             location = result.get('headers', {}).get('location', '').lower()
             if any(err in location for err in ['error', '404', 'login', 'auth', 'signin']):
                 return False
 
-        # Проверяем длину контента
+        #Проверка длины контента
         content_length = result.get('content_length', 0)
         if content_length < 50:  # Слишком короткий ответ
             return False
 
-        # Проверяем текст на ошибки
+        #Проверка текста на ошибки
         text = result.get('text', '').lower()
         for error_keyword in self.error_keywords:
             if error_keyword in text:
