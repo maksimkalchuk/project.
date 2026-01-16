@@ -28,35 +28,28 @@ except ImportError:
     PDF_SUPPORT = False
 class XSSAuditor:
     def __init__(self, target_url, max_threads=10, cookies=None, headers=None):
-        """
-        Специализированный XSS-сканер
-
-
+        """Специализированный XSS-сканер
         target_url (str): Целевой URL для сканирования
         max_threads (int): Максимальное количество потоков
         cookies (dict): Куки для аутентификации
-        headers (dict): Заголовки HTTP
-        """
+        headers (dict): Заголовки HTTP"""
         self.target_url = target_url.rstrip('/')
         parsed_url =urlparse(target_url)
         self.base_domain= parsed_url.netloc
         self.scheme = parsed_url.scheme or 'http'
         self.max_threads =max_threads
         self.session =requests.Session()
-        default_headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        default_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
             'Connection': 'keep-alive',
-            'Referer': target_url,
-        }
+            'Referer': target_url,}
 
         if headers:
             default_headers.update(headers)
         self.session.headers.update(default_headers)
 
         self.vulnerabilities = []
-
         self.stats = {
             'start_time': time.time(),
             'requests_sent': 0,
@@ -68,18 +61,15 @@ class XSSAuditor:
             'stored_xss_potential': 0,
             'dom_xss_potential': 0,
         }
-
-
         self.xss_payloads = self._load_comprehensive_xss_payloads()
         self.lock = threading.Lock()
-
         print(f"Инициализирован XSS-сканер для: {self.target_url}")
         print(f"Загружено XSS-векторов: {len(self.xss_payloads)}")
 
     def _load_comprehensive_xss_payloads(self):
         """Загрузка полного набора XSS векторов"""
         payloads = []
-        print("Загрузка базовых XSS векторов...")
+        print("Загрузка базовых XSS векторов")
         basic_payloads = [
             '<script>alert("XSS")</script>',
             '<script>alert(1)</script>',
@@ -134,7 +124,7 @@ class XSSAuditor:
         ]
         payloads.extend(polymorphic_payloads)
 
-        print("[*] Загрузка векторов событий")
+        print("Загрузка векторов событий")
         event_payloads = [
             '<BODY ONLOAD=alert("XSS")>',
             '<body onload=alert(1)>',
@@ -155,7 +145,7 @@ class XSSAuditor:
         ]
         payloads.extend(event_payloads)
 
-        print("[*] Загрузка HTML5 векторов")
+        print("Загрузка HTML5 векторов")
         html5_payloads = [
             '<details open ontoggle=alert(1)>',
             '<details ontoggle=alert(1)>',
@@ -240,8 +230,7 @@ class XSSAuditor:
 
             main_response = self._safe_request('GET', self.target_url)
             if not main_response or main_response.status_code != 200:
-                print(
-                    f"Ошибка доступа к сайту (код: {main_response.status_code if main_response else 'нет ответа'})")
+                print(f"Ошибка доступа к сайту (код: {main_response.status_code if main_response else 'нет ответа'})")
                 return self.vulnerabilities
 
             self.stats['pages_scanned'] += 1
@@ -400,7 +389,7 @@ class XSSAuditor:
                     forms.append(form_data)
 
             except Exception as e:
-                print(f"[-] Ошибка BeautifulSoup: {e}")
+                print(f"Ошибка BeautifulSoup: {e}")
                 forms = self._find_forms_regex(html_content)
         else:
             forms = self._find_forms_regex(html_content)
@@ -425,7 +414,7 @@ class XSSAuditor:
                     'html': form_html[:500]
                 }
 
-                # Полный URL действия
+                #Полный URL действия
                 if form_data['action']:
                     if form_data['action'].startswith('http'):
                         form_data['full_action'] = form_data['action']
@@ -436,7 +425,7 @@ class XSSAuditor:
                 else:
                     form_data['full_action'] = self.target_url
 
-                # Поиск полей ввода
+                #Поиск полей ввода
                 form_data['inputs'] = []
                 input_matches = re.findall(r'<input[^>]*>', form_html, re.IGNORECASE)
 
@@ -465,8 +454,7 @@ class XSSAuditor:
             r'href=["\']([^"\']+)["\']',
             r'src=["\']([^"\']+)["\']',
             r'action=["\']([^"\']+)["\']',
-            r'url\(["\']?([^"\'\)]+)["\']?\)',
-        ]
+            r'url\(["\']?([^"\'\)]+)["\']?\)',]
         for pattern in patterns:
             matches = re.findall(pattern, html_content, re.IGNORECASE)
             for match in matches:
@@ -489,14 +477,14 @@ class XSSAuditor:
     def _find_javascript_sources(self, html_content):
         """Поиск источников JavaScript"""
         sources = set()
-        # Внешние скрипты
+        #Внешние скрипты
         script_matches = re.findall(r'<script[^>]*src=["\']([^"\']+)["\'][^>]*>', html_content, re.IGNORECASE)
         for src in script_matches:
             full_url = self._make_absolute_url(src)
             if full_url:
                 sources.add(full_url)
 
-        # Встроенные скрипты
+        #Встроенные скрипты
         inline_scripts = re.findall(r'<script[^>]*>(.*?)</script>', html_content, re.IGNORECASE | re.DOTALL)
         for script in inline_scripts[:5]:
             if len(script.strip()) > 10:
@@ -509,7 +497,7 @@ class XSSAuditor:
         vulnerabilities = []
         tested_urls = set()
 
-        # Ограничиваем количество URL для тестирования
+        #Ограничиваем количество URL для тестирования
         max_urls_to_test = min(50, len(urls))
         test_urls = urls[:max_urls_to_test]
 
@@ -532,13 +520,8 @@ class XSSAuditor:
                             #тестовый запрос
                             test_params = {param_name: payload}
                             test_url = f"{base_url}?{urlencode(test_params)}"
-
-                            #не тестировали ли уже этот URL
-                            if test_url in tested_urls:
-                                continue
-                            tested_urls.add(test_url)
-
-                            #отправление запрос
+                            
+                            #отправление запроса
                             response = self._safe_request('GET', test_url)
                             if not response:
                                 continue
@@ -554,8 +537,7 @@ class XSSAuditor:
                                     'response_code': response.status_code,
                                     'confidence': 'High',
                                     'description': f'Обнаружена reflected XSS уязвимость в параметре "{param_name}". Пейлоад отображается и выполняется в браузере.',
-                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                }
+                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
                                 vulnerabilities.append(vuln)
 
@@ -584,8 +566,7 @@ class XSSAuditor:
                 #только текстовые поля
                 text_inputs = [
                     inp for inp in form['inputs']
-                    if inp['type'] in ['text', 'search', 'email', 'url', 'textarea', None]
-                ]
+                    if inp['type'] in ['text', 'search', 'email', 'url', 'textarea', None]]
 
                 if not text_inputs:
                     continue
@@ -626,8 +607,7 @@ class XSSAuditor:
                             'response_code': response.status_code,
                             'confidence': 'High',
                             'description': f'Обнаружена XSS уязвимость в поле "{first_input["name"]}" формы. Пейлоад не фильтруется и выполняется в браузере.',
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        }
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
                         if form['method'] == 'GET':
                             vuln['url'] = f"{form['full_action']}?{first_input['name']}={quote(payload)}"
@@ -657,8 +637,7 @@ class XSSAuditor:
                 'location.href', 'location.hash', 'location.search',
                 'window.open', 'window.location', 'document.location',
                 'postMessage', 'addEventListener', 'attachEvent',
-                'execScript', 'msWriteProfilerMark',
-            ]
+                'execScript', 'msWriteProfilerMark', ]
 
             #в HTML
             for func in dangerous_functions:
@@ -670,16 +649,14 @@ class XSSAuditor:
                         'confidence': 'Medium',
                         'description': f'Обнаружена потенциально опасная функция "{func}" которая может привести к DOM-based XSS.',
                         'recommendation': 'Используйте textContent вместо innerHTML, избегайте eval() и document.write()',
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    }
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                     vulnerabilities.append(vuln)
 
             #обработчики событий с пользовательским вводом
             event_handlers = [
                 'onload', 'onerror', 'onclick', 'onmouseover',
                 'onfocus', 'onblur', 'onchange', 'onsubmit',
-                'onkeydown', 'onkeypress', 'onkeyup',
-            ]
+                'onkeydown', 'onkeypress', 'onkeyup',]
 
             for handler in event_handlers:
                 pattern = rf'{handler}=["\']([^"\']+)["\']'
@@ -693,15 +670,13 @@ class XSSAuditor:
                             'confidence': 'Medium',
                             'description': f'Обнаружен обработчик события "{handler}" с потенциально опасным кодом.',
                             'recommendation': 'Валидируйте и экранируйте данные перед использованием в обработчиках событий',
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        }
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                         vulnerabilities.append(vuln)
 
-            #источники из недоверенных источников
+            #из недоверенных источников
             url_sources = [
                 'location.hash', 'location.search', 'document.URL',
-                'document.referrer', 'window.name', 'document.cookie',
-            ]
+                'document.referrer', 'window.name', 'document.cookie',]
 
             for source in url_sources:
                 if source in html_content:
@@ -711,12 +686,11 @@ class XSSAuditor:
                         'confidence': 'Low',
                         'description': f'Обнаружено использование непроверенного источника данных "{source}".',
                         'recommendation': 'Всегда валидируйте и экранируйте данные из непроверенных источников',
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    }
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                     vulnerabilities.append(vuln)
 
         except Exception as e:
-            print(f"[-] Ошибка поиска DOM XSS: {e}")
+            print(f"Ошибка поиска DOM XSS: {e}")
 
         return vulnerabilities
 
@@ -749,8 +723,7 @@ class XSSAuditor:
                                     'confidence': 'Low',
                                     'description': f'Обнаружено поле "{field_name}" (похоже на поле для контента) которое может быть уязвимо для Stored XSS.',
                                     'recommendation': 'Всегда экранируйте пользовательский контент перед сохранением в БД и перед выводом',
-                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                }
+                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                                 vulnerabilities.append(vuln)
                                 break
 
@@ -766,8 +739,7 @@ class XSSAuditor:
                             'confidence': 'Medium',
                             'description': f'Обнаружено текстовое поле "{textarea["name"]}" которое может быть уязвимо для Stored XSS.',
                             'recommendation': 'Всегда экранируйте содержимое textarea перед сохранением и выводом',
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        }
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                         vulnerabilities.append(vuln)
 
         except Exception as e:
@@ -790,8 +762,7 @@ class XSSAuditor:
         encoded_versions = [
             quote(payload),
             payload.replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#x27;'),
-            payload.replace('<', '%3C').replace('>', '%3E'),
-        ]
+            payload.replace('<', '%3C').replace('>', '%3E'), ]
 
         for encoded in encoded_versions:
             if encoded in content:
@@ -810,8 +781,7 @@ class XSSAuditor:
             'onerror=', 'onload=', 'onmouseover=', 'onclick=', 'onfocus=',
             'javascript:', 'alert(', 'confirm(', 'prompt(',
             'document.', 'window.', 'location.',
-            'eval(', 'setTimeout(', 'setInterval(',
-        ]
+            'eval(', 'setTimeout(', 'setInterval(', ]
 
         for indicator in js_indicators:
             if indicator in content:
@@ -825,7 +795,7 @@ class XSSAuditor:
                 f'"{payload}"',  #Внутри атрибутов
                 f"'{payload}'",  #Внутри атрибутов с одинарными кавычками
                 f'={payload}',  #После знака равно
-            ]
+]
 
             for context in contexts:
                 if context in content:
@@ -853,21 +823,21 @@ class XSSAuditor:
         print("=" * 70)
 
         print(f"\nСтатистика:")
-        print(f"  Общее время: {duration:.2f} секунд")
-        print(f"  Отправлено запросов: {self.stats['requests_sent']}")
-        print(f"  Проверено страниц: {self.stats['pages_scanned']}")
-        print(f"  Найдено форм: {self.stats['forms_found']}")
-        print(f"  Протестировано параметров: {self.stats['parameters_tested']}")
+        print(f"Общее время: {duration:.2f} секунд")
+        print(f"Отправлено запросов: {self.stats['requests_sent']}")
+        print(f"Проверено страниц: {self.stats['pages_scanned']}")
+        print(f"Найдено форм: {self.stats['forms_found']}")
+        print(f"Протестировано параметров: {self.stats['parameters_tested']}")
 
         if duration > 0:
             speed = self.stats['requests_sent'] / duration
             print(f"  Скорость: {speed:.1f} запросов/сек")
 
         print(f"\nНайденные уязвимости:")
-        print(f"  Всего: {self.stats['vulnerabilities_found']}")
-        print(f"  Reflected XSS: {self.stats['reflected_xss']}")
-        print(f"  DOM-based XSS (потенциальные): {self.stats['dom_xss_potential']}")
-        print(f"  Stored XSS (потенциальные): {self.stats['stored_xss_potential']}")
+        print(f"Всего: {self.stats['vulnerabilities_found']}")
+        print(f"Reflected XSS: {self.stats['reflected_xss']}")
+        print(f"DOM-based XSS (потенциальные): {self.stats['dom_xss_potential']}")
+        print(f"Stored XSS (потенциальные): {self.stats['stored_xss_potential']}")
 
         if self.vulnerabilities:
             print(f"\nКритические уязвимости:")
@@ -876,22 +846,22 @@ class XSSAuditor:
                     vuln_type = vuln['type'].replace('Reflected XSS', 'XSS')
                     print(f"  {i}. {vuln_type}")
                     if 'parameter' in vuln:
-                        print(f"     Параметр: {vuln['parameter']}")
+                        print(f"Параметр: {vuln['parameter']}")
                     elif 'vulnerable_field' in vuln:
-                        print(f"     Поле: {vuln['vulnerable_field']}")
+                        print(f"Поле: {vuln['vulnerable_field']}")
                     if 'url' in vuln:
-                        print(f"     URL: {vuln['url'][:80]}...")
+                        print(f"URL: {vuln['url'][:80]}")
 
         # Оценка безопасности
         print(f"\nОценка Безопасности:")
         if self.stats['reflected_xss'] > 0:
-            print("УРОВЕНЬ БЕЗОПАСНОСТИ: НИЗКИЙ")
+            print("уровень безопасности: низкий")
             print("Обнаружены критические XSS уязвимости")
         elif self.stats['vulnerabilities_found'] > 0:
-            print("УРОВЕНЬ БЕЗОПАСНОСТИ: СРЕДНИЙ")
+            print("уровень безопасности: средний")
             print("Обнаружены потенциальные уязвимости")
         else:
-            print("УРОВЕНЬ БЕЗОПАСНОСТИ: ВЫСОКИЙ")
+            print("уровень безопасности: высокий")
             print("Критические XSS уязвимости не обнаружены")
 
         print("\n" + "=" * 70)
@@ -924,24 +894,21 @@ class XSSAuditor:
 
         with open(filename, 'w', encoding='utf-8') as f:
             f.write("=" * 80 + "\n")
-            f.write("ОТЧЕТ ОБ XSS АУДИТЕ БЕЗОПАСНОСТИ\n")
+            f.write("Отчёт об XSS аудите безопасности\n")
             f.write("=" * 80 + "\n\n")
             f.write("1. Информация о сканировании\n")
             f.write("-" * 80 + "\n")
             f.write(f"Цель сканирования: {self.target_url}\n")
             f.write(f"Домен: {self.base_domain}\n")
-            f.write(
-                f"Начало сканирования: {datetime.fromtimestamp(self.stats['start_time']).strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Начало сканирования: {datetime.fromtimestamp(self.stats['start_time']).strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"Длительность сканирования: {time.time() - self.stats['start_time']:.2f} секунд\n")
             f.write(f"Всего XSS векторов: {len(self.xss_payloads)}\n\n")
-
             f.write("2. Статистика сканирования\n")
             f.write("-" * 80 + "\n")
             f.write(f"Отправлено HTTP запросов: {self.stats['requests_sent']}\n")
             f.write(f"Проверено страниц: {self.stats['pages_scanned']}\n")
             f.write(f"Найдено HTML форм: {self.stats['forms_found']}\n")
             f.write(f"Протестировано параметров: {self.stats['parameters_tested']}\n\n")
-
             f.write("3. Результаты тестирования\n")
             f.write("-" * 80 + "\n")
             f.write(f"Всего обнаружено проблем: {self.stats['vulnerabilities_found']}\n")
@@ -962,17 +929,17 @@ class XSSAuditor:
                         f.write(f"\n{i}. {vuln['type']}\n")
                         f.write(f"   Уверенность: {vuln.get('confidence', 'Неизвестно')}\n")
                         if 'url' in vuln:
-                            f.write(f"   URL: {vuln['url']}\n")
+                            f.write(f"URL: {vuln['url']}\n")
                         elif 'form_action' in vuln:
-                            f.write(f"   Форма: {vuln['form_action']}\n")
+                            f.write(f"Форма: {vuln['form_action']}\n")
                         if 'parameter' in vuln:
-                            f.write(f"   Уязвимый параметр: {vuln['parameter']}\n")
+                            f.write(f"Уязвимый параметр: {vuln['parameter']}\n")
                         elif 'vulnerable_field' in vuln:
-                            f.write(f"   Уязвимое поле: {vuln['vulnerable_field']}\n")
-                        f.write(f"   Использованный пейлоад: {vuln.get('payload', 'N/A')}\n")
-                        f.write(f"   Метод: {vuln.get('method', 'N/A')}\n")
-                        f.write(f"   Описание: {vuln.get('description', 'Нет описания')}\n")
-                        f.write(f"   Время обнаружения: {vuln.get('timestamp', 'N/A')}\n")
+                            f.write(f"Уязвимое поле: {vuln['vulnerable_field']}\n")
+                        f.write(f"Использованный пейлоад: {vuln.get('payload', 'N/A')}\n")
+                        f.write(f"Метод: {vuln.get('method', 'N/A')}\n")
+                        f.write(f"Описание: {vuln.get('description', 'Нет описания')}\n")
+                        f.write(f"Время обнаружения: {vuln.get('timestamp', 'N/A')}\n")
 
                 #DOM-based XSS
                 dom_based = [v for v in self.vulnerabilities if 'DOM-based' in v.get('type', '')]
@@ -981,45 +948,44 @@ class XSSAuditor:
                     f.write("-" * 40 + "\n")
                     for i, vuln in enumerate(dom_based, 1):
                         f.write(f"\n{i}. {vuln['type']}\n")
-                        f.write(f"   Уверенность: {vuln.get('confidence', 'Неизвестно')}\n")
-                        f.write(
-                            f"   Опасная функция/источник: {vuln.get('dangerous_function', vuln.get('untrusted_source', 'N/A'))}\n")
-                        f.write(f"   Описание: {vuln.get('description', 'Нет описания')}\n")
-                        f.write(f"   Рекомендация: {vuln.get('recommendation', 'Нет рекомендации')}\n")
+                        f.write(f"Уверенность: {vuln.get('confidence', 'Неизвестно')}\n")
+                        f.write(f"Опасная функция/источник: {vuln.get('dangerous_function', vuln.get('untrusted_source', 'N/A'))}\n")
+                        f.write(f"Описание: {vuln.get('description', 'Нет описания')}\n")
+                        f.write(f"Рекомендация: {vuln.get('recommendation', 'Нет рекомендации')}\n")
 
                 #Stored XSS
                 stored = [v for v in self.vulnerabilities if 'Stored' in v.get('type', '')]
                 if stored:
-                    f.write("\n4.3. STORED XSS (ПОТЕНЦИАЛЬНЫЕ)\n")
+                    f.write("\n4.3. Stored XSS (ПОТЕНЦИАЛЬНЫЕ)\n")
                     f.write("-" * 40 + "\n")
                     for i, vuln in enumerate(stored, 1):
                         f.write(f"\n{i}. {vuln['type']}\n")
-                        f.write(f"   Уверенность: {vuln.get('confidence', 'Неизвестно')}\n")
-                        f.write(f"   Форма/поле: {vuln.get('form_action', 'N/A')} - {vuln.get('field_name', 'N/A')}\n")
-                        f.write(f"   Описание: {vuln.get('description', 'Нет описания')}\n")
-                        f.write(f"   Рекомендация: {vuln.get('recommendation', 'Нет рекомендации')}\n")
+                        f.write(f"Уверенность: {vuln.get('confidence', 'Неизвестно')}\n")
+                        f.write(f"Форма/поле: {vuln.get('form_action', 'N/A')} - {vuln.get('field_name', 'N/A')}\n")
+                        f.write(f"Описание: {vuln.get('description', 'Нет описания')}\n")
+                        f.write(f"Рекомендация: {vuln.get('recommendation', 'Нет рекомендации')}\n")
 
             f.write("\n5. Рекомендации по безопасности\n")
             f.write("-" * 80 + "\n")
 
             f.write("\n5.1. Для reflected XSS:\n")
-            f.write("• Всегда экранируйте пользовательский ввод перед выводом на страницу\n")
-            f.write("• Валидируйте входные данные (белые списки лучше черных)\n")
-            f.write("• Кодируйте специальные символы: <, >, \", ', &\n")
+            f.write("Всегда экранируйте пользовательский ввод перед выводом на страницу\n")
+            f.write("Валидируйте входные данные (белые списки лучше черных)\n")
+            f.write("Кодируйте специальные символы: <, >, \", ', &\n")
 
             f.write("\n5.2. Для dom-based XSS:\n")
-            f.write("• Используйте textContent вместо innerHTML\n")
-            f.write("• Используйте Content Security Policy (CSP)\n")
-            f.write("• Регулярно обновляйте JavaScript библиотеки\n")
+            f.write("Используйте textContent вместо innerHTML\n")
+            f.write("Используйте Content Security Policy (CSP)\n")
+            f.write("Регулярно обновляйте JavaScript библиотеки\n")
 
             f.write("\n5.3. Для Stored XSS:\n")
-            f.write("• Экранируйте данные при сохранении И при выводе\n")
-            f.write("• Ограничивайте длину и тип вводимых данных\n")
-            f.write("• Реализуйте moderation для пользовательского контента\n")
+            f.write("Экранируйте данные при сохранении И при выводе\n")
+            f.write("Ограничивайте длину и тип вводимых данных\n")
+            f.write("Реализуйте moderation для пользовательского контента\n")
 
             f.write("\n5.4. Общие меры:\n")
-            f.write("• Используйте X-XSS-Protection заголовки\n")
-            f.write("• Регулярно проводите тестирование на проникновение\n")
+            f.write("Используйте X-XSS-Protection заголовки\n")
+            f.write("Регулярно проводите тестирование на проникновение\n")
 
             f.write("\n" + "=" * 80 + "\n")
             f.write("КОНЕЦ ОТЧЕТА\n")
@@ -1061,8 +1027,7 @@ def main():
     scanner = XSSAuditor(
         target_url=args.url,
         max_threads=args.threads,
-        cookies=cookies_dict
-    )
+        cookies=cookies_dict)
 
     try:
         if args.fast:
@@ -1116,22 +1081,22 @@ def check_reportlab():
         from reportlab.pdfbase.ttfonts import TTFont
         return True
     except ImportError:
-        print("[!] Библиотека 'reportlab' не установлена")
-        print("[*] Пытаюсь установить")
+        print("Библиотека 'reportlab' не установлена")
+        print("Пытаюсь установить")
         try:
             import subprocess
             subprocess.check_call([sys.executable, "-m", "pip", "install", "reportlab"])
-            print("[+] Установка успешна")
+            print("Установка успешна")
             return True
         except:
-            print("[-] Не удалось установить reportlab")
-            print("[*] Установите вручную: pip install reportlab")
+            print("Не удалось установить reportlab")
+            print("Установите вручную: pip install reportlab")
             return False
 
 
 #Проверка
 if not check_reportlab():
-    print("[*] Будут создаваться только текстовые отчеты")
+    print("Будут создаваться только текстовые отчеты")
 
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
@@ -1163,8 +1128,7 @@ class SimpleIDORBruteforceScanner:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Connection': 'keep-alive',
-        }
+            'Connection': 'keep-alive'}
 
         if headers:
             default_headers.update(headers)
@@ -1179,8 +1143,7 @@ class SimpleIDORBruteforceScanner:
             'vulnerabilities_found': 0,
             'combinations_tested': 0,
             'start_time': time.time(),
-            'total_combinations': 0
-        }
+            'total_combinations': 0}
 
         #Алфавит для генерации комбинаций
         self.alphabet = string.ascii_letters + string.digits  # a-z, A-Z, 0-9
@@ -1192,21 +1155,18 @@ class SimpleIDORBruteforceScanner:
             'user', 'profile', 'account', 'email', 'phone', 'address',
             'name', 'data', 'info', 'details', 'settings', 'password',
             'dashboard', 'panel', 'admin', 'administrator', 'welcome',
-            'персональные данные', 'личный кабинет', 'профиль', 'аккаунт'
-        ]
+            'персональные данные', 'личный кабинет', 'профиль', 'аккаунт']
 
         #Ключевые слова для определения ошибок
         self.error_keywords = [
             '404', 'not found', 'error', 'page not found',
             'does not exist', 'invalid', 'forbidden', 'unauthorized',
-            'ошибка 404', 'страница не найдена', 'доступ запрещен'
-        ]
+            'ошибка 404', 'страница не найдена', 'доступ запрещен']
 
     def scan(self):
         """Основной метод сканирования"""
         print(f"Начало сканирования IDOR: {self.target_url}")
         print(f"Максимальное количество потоков: {self.max_threads}")
-        print("-" * 60)
 
         try:
             #Получить базовый путь для брутфорса
@@ -1222,7 +1182,7 @@ class SimpleIDORBruteforceScanner:
             print(f"Полный перебор займет много времени")
 
             #Генерация и тестирование комбинаций
-            print("[*] Этап 3: Генерация и тестирование комбинаций")
+            print("Этап 3: Генерация и тестирование комбинаций")
 
             strategy = self._ask_scan_strategy()
 
@@ -1252,15 +1212,13 @@ class SimpleIDORBruteforceScanner:
 
     def _ask_scan_strategy(self):
         """Спросить пользователя о стратегии сканирования"""
-        print("\n" + "=" * 60)
         print("Выберите стратегию сканирования:")
-        print("=" * 60)
-        print("1. Случайная выборка (1,000 комбинаций) - быстро")
-        print("2. Случайная выборка (10,000 комбинаций) - средне")
-        print("3. Случайная выборка (50,000 комбинаций) - медленно")
-        print("4. Перебор по паттернам")
-        print("5. Последовательный перебор (первые 10,000)")
-        print("6. Ввести количество комбинаций вручную")
+        print("1.Случайная выборка (1,000 комбинаций) - быстро")
+        print("2.Случайная выборка (10,000 комбинаций) - средне")
+        print("3.Случайная выборка (50,000 комбинаций) - медленно")
+        print("4.Перебор по паттернам")
+        print("5.Последовательный перебор (первые 10,000)")
+        print("6.Ввести количество комбинаций вручную")
         while True:
             try:
                 choice=input("\nВаш выбор (1-6): ").strip()
@@ -1352,7 +1310,7 @@ class SimpleIDORBruteforceScanner:
         combinations.update(numeric_patterns)
 
         #Буквенные комбинации
-        print("[*] Буквенные паттерны...")
+        print("Буквенные паттерны")
         letter_patterns = [
             'aaaaaa','AAAAAA', 'bbbbbb', 'BBBBBB', 'cccccc', 'CCCCCC',
             'abcdef', 'ABCDEF', 'fedcba', 'FEDCBA',
@@ -1361,7 +1319,7 @@ class SimpleIDORBruteforceScanner:
         combinations.update(letter_patterns)
 
         #Комбинации на основе слов
-        print("[*] Комбинации на основе слов")
+        print("Комбинации на основе слов")
         words = ['admin', 'user', 'test', 'guest', 'demo', 'root', 'super', 'system']
         for word in words:
             #дополнение слова до 6 символов
@@ -1456,7 +1414,7 @@ class SimpleIDORBruteforceScanner:
                 count = int(input("Введите количество комбинаций для тестирования (1-500000): "))
                 if 1 <= count <= 500000:
                     break
-                print("Пожалуйста, введите число от 1 до 500000")
+                print("Пожалуйста, введите число от 1 до 100000")
             except ValueError:
                 print("Пожалуйста, введите число")
             except KeyboardInterrupt:
@@ -1501,7 +1459,7 @@ class SimpleIDORBruteforceScanner:
 
                 #прогресс
                 tested_so_far = i + len(batch)
-                print(f"[*] Прогресс: {tested_so_far}/{total} ({tested_so_far / total * 100:.1f}%)")
+                print(f"Прогресс: {tested_so_far}/{total} ({tested_so_far / total * 100:.1f}%)")
 
     def _test_single_url(self, url, combo):
         """Тестирование одного URL"""
@@ -1566,16 +1524,15 @@ class SimpleIDORBruteforceScanner:
                     'confidence': 'High',
                     'evidence': self._get_vulnerability_evidence(result),
                     'discovery_method': '6-char bruteforce',
-                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
                 self.vulnerabilities.append(vulnerability)
                 self.stats['vulnerabilities_found'] += 1
 
                 print(f"\nНайдена уязвимость IDOR")
-                print(f"    Комбинация: {combo}")
-                print(f"    Статус код: {result.get('status_code')}")
-                print(f"    Длина контента: {result.get('content_length')}")
+                print(f"Комбинация: {combo}")
+                print(f"Статус код: {result.get('status_code')}")
+                print(f"Длина контента: {result.get('content_length')}")
 
         except Exception as e:
             pass
@@ -1591,7 +1548,7 @@ class SimpleIDORBruteforceScanner:
         if status_code in [404, 403, 500, 401, 400]:
             return False
 
-        #Пропуск редиректов на ошибки
+        #Пропуск на ошибки
         if status_code in [301, 302, 303, 307, 308]:
             location = result.get('headers', {}).get('location', '').lower()
             if any(err in location for err in ['error', '404', 'login', 'auth', 'signin']):
@@ -1613,9 +1570,9 @@ class SimpleIDORBruteforceScanner:
             if success_keyword in text:
                 return True
 
-        # Если статус 200 и достаточно длинный контент
+        #Если статус 200 и достаточно длинный контент
         if status_code == 200 and content_length > 200:
-            # Проверяем, не является ли это стандартной страницей
+            #Не является ли это стандартной страницей
             if not self._is_default_page(text):
                 return True
 
@@ -1625,7 +1582,7 @@ class SimpleIDORBruteforceScanner:
         """Проверка, является ли страница стандартной"""
         text_lower = text.lower()
 
-        # Проверяем стандартные заголовки/футеры
+        #Проверяем стандартные заголовки/футеры
         default_indicators = [
             'welcome to nginx', 'apache', 'index of /',
             'test page for', 'default page', 'it works',
@@ -1636,7 +1593,7 @@ class SimpleIDORBruteforceScanner:
             if indicator in text_lower:
                 return True
 
-        # Проверяем слишком простой HTML
+        #Проверяем слишком простой HTML
         if text_lower.count('<') < 5 and text_lower.count('>') < 5:
             return True
 
@@ -1671,9 +1628,7 @@ class SimpleIDORBruteforceScanner:
         """Вывод статистики сканирования"""
         duration = time.time() - self.stats['start_time']
 
-        print("\n" + "=" * 60)
         print("Статистика сканирования IDOR")
-        print("=" * 60)
         print(f"Общее время: {duration:.2f} секунд")
         print(f"Скорость: {self.stats['requests_sent'] / max(duration, 1):.1f} запросов/сек")
         print(f"Отправлено запросов: {self.stats['requests_sent']}")
@@ -1690,12 +1645,11 @@ class SimpleIDORBruteforceScanner:
             print("Найденные уязвимости:")
             for i, vuln in enumerate(self.vulnerabilities[:10], 1):
                 print(f"{i}. {vuln['url']}")
-                print(f"   Комбинация: {vuln['combo']}")
-                print(f"   Уверенность: {vuln['confidence']}")
+                print(f"Комбинация: {vuln['combo']}")
+                print(f"Уверенность: {vuln['confidence']}")
         else:
             print("Уязвимости не найдены")
 
-        print("=" * 60)
 
     def _setup_russian_fonts(self):
         """Настройка русских шрифтов для PDF"""
@@ -1847,7 +1801,7 @@ class SimpleIDORBruteforceScanner:
             story.append(info_table)
             story.append(Spacer(1, 20))
 
-            # Результаты сканирования
+            #Результаты сканирования
             if self.vulnerabilities:
                 story.append(Paragraph("Результаты сканирования", heading_style))
                 story.append(Paragraph(f"Найдено уязвимостей: {len(self.vulnerabilities)}", subheading_style))
@@ -1868,7 +1822,7 @@ class SimpleIDORBruteforceScanner:
                         ['Время обнаружения', vuln.get('timestamp', 'N/A')]
                     ]
 
-                    # Создаем таблицу для уязвимости
+                    #Создаем таблицу для уязвимости
                     vuln_table_data = []
                     for row in vuln_data:
                         table_row = []
@@ -1878,13 +1832,13 @@ class SimpleIDORBruteforceScanner:
 
                     vuln_table = Table(vuln_table_data, colWidths=[150, 350])
 
-                    # Цвет в зависимости от уверенности
+                    #Цвет в зависимости от уверенности
                     if vuln.get('confidence') == 'High':
-                        header_color = colors.HexColor('#E74C3C')  # Красный
-                        row_color = colors.HexColor('#FDEDEC')  # Светло-красный
+                        header_color = colors.HexColor('#E74C3C')  #Красный
+                        row_color = colors.HexColor('#FDEDEC')  #Светло-красный
                     else:
-                        header_color = colors.HexColor('#F39C12')  # Оранжевый
-                        row_color = colors.HexColor('#FEF5E7')  # Светло-оранжевый
+                        header_color = colors.HexColor('#F39C12')  #Оранжевый
+                        row_color = colors.HexColor('#FEF5E7')  #Светло-оранжевый
 
                     vuln_table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), header_color),
@@ -1910,10 +1864,10 @@ class SimpleIDORBruteforceScanner:
 
             story.append(Paragraph("1. ЗАЩИТА ОТ ПЕРЕБОРА (BRUTEFORCE):", subheading_style))
             recommendations = [
-                "• Внедрите ограничение запросов (rate limiting)",
-                "• Используйте CAPTCHA для подозрительных запросов",
-                "• Добавьте задержки между попытками доступа",
-                "• Блокируйте IP-адреса после множества неудачных попыток"
+                "Внедрите ограничение запросов (rate limiting)",
+                "Используйте CAPTCHA для подозрительных запросов",
+                "Добавьте задержки между попытками доступа",
+                "Блокируйте IP-адреса после множества неудачных попыток"
             ]
 
             for rec in recommendations:
@@ -1921,12 +1875,12 @@ class SimpleIDORBruteforceScanner:
 
             story.append(Spacer(1, 12))
 
-            story.append(Paragraph("2. БЕЗОПАСНЫЕ ИДЕНТИФИКАТОРЫ:", subheading_style))
+            story.append(Paragraph("2.БЕЗОПАСНЫЕ ИДЕНТИФИКАТОРЫ:", subheading_style))
             recommendations = [
-                "• Используйте UUID/GUID вместо последовательных чисел",
-                "• Минимальная длина идентификатора - 16+ случайных символов",
-                "• Регулярно меняйте идентификаторы сессий",
-                "• Не используйте предсказуемые паттерны (user1, user2)"
+                "Используйте UUID/GUID вместо последовательных чисел",
+                "Минимальная длина идентификатора - 16+ случайных символов",
+                "Регулярно меняйте идентификаторы сессий",
+                "Не используйте предсказуемые паттерны (user1, user2)"
             ]
 
             for rec in recommendations:
@@ -1936,10 +1890,10 @@ class SimpleIDORBruteforceScanner:
 
             story.append(Paragraph("3. КОНТРОЛЬ ДОСТУПА:", subheading_style))
             recommendations = [
-                "• Проверяйте права доступа для КАЖДОГО запроса",
-                "• Внедрите систему RBAC (Role-Based Access Control)",
-                "• Используйте токены с ограниченным сроком действия",
-                "• Реализуйте проверку на уровне приложения и БД"
+                "Проверяйте права доступа для КАЖДОГО запроса",
+                "Внедрите систему RBAC (Role-Based Access Control)",
+                "Используйте токены с ограниченным сроком действия",
+                "Реализуйте проверку на уровне приложения и БД"
             ]
 
             for rec in recommendations:
@@ -1949,10 +1903,10 @@ class SimpleIDORBruteforceScanner:
 
             story.append(Paragraph("4. МОНИТОРИНГ И АУДИТ:", subheading_style))
             recommendations = [
-                "• Ведите логи всех запросов к защищенным ресурсам",
-                "• Настройте оповещения о подозрительной активности",
-                "• Регулярно проводите тестирование на проникновение",
-                "• Используйте системы обнаружения вторжений (IDS)"
+                "Ведите логи всех запросов к защищенным ресурсам",
+                "Настройте оповещения о подозрительной активности",
+                "Регулярно проводите тестирование на проникновение",
+                "Используйте системы обнаружения вторжений (IDS)"
             ]
 
             for rec in recommendations:
@@ -1960,7 +1914,7 @@ class SimpleIDORBruteforceScanner:
 
             story.append(Spacer(1, 20))
 
-            # Заключение
+            #Заключение
             story.append(Paragraph("Заключение", heading_style))
             story.append(Paragraph(
                 "Данный отчет содержит результаты автоматизированного аудита безопасности "
@@ -1984,7 +1938,7 @@ class SimpleIDORBruteforceScanner:
             print(f"Ошибка создания PDF отчета: {e}")
             import traceback
             traceback.print_exc()
-            # Создаем текстовый отчет как запасной вариант
+            #Создаем текстовый отчет как запасной вариант
             self.generate_text_report(filename.replace('.pdf', '.txt'))
 
     def generate_text_report(self, filename="idor_report.txt"):
@@ -1995,9 +1949,8 @@ class SimpleIDORBruteforceScanner:
 
         report_lines = []
 
-        report_lines.append("=" * 80)
+
         report_lines.append("Отчет об аудите IDOR уязвимостей")
-        report_lines.append("=" * 80)
         report_lines.append(f"Цель: {self.target_url}")
         report_lines.append(f"Дата сканирования: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         report_lines.append(f"Метод: Перебор 6-символьных комбинаций")
@@ -2013,12 +1966,12 @@ class SimpleIDORBruteforceScanner:
 
             for i, vuln in enumerate(self.vulnerabilities, 1):
                 report_lines.append(f"{i}. {vuln['type']}")
-                report_lines.append(f"   URL: {vuln['url']}")
-                report_lines.append(f"   Комбинация: {vuln['combo']}")
-                report_lines.append(f"   Код ответа: {vuln.get('status_code', 'N/A')}")
-                report_lines.append(f"   Длина ответа: {vuln.get('content_length', 'N/A')}")
-                report_lines.append(f"   Уверенность: {vuln.get('confidence', 'Неизвестно')}")
-                report_lines.append(f"   Доказательства: {vuln.get('evidence', 'Нет')}")
+                report_lines.append(f"URL: {vuln['url']}")
+                report_lines.append(f"Комбинация: {vuln['combo']}")
+                report_lines.append(f"Код ответа: {vuln.get('status_code', 'N/A')}")
+                report_lines.append(f"Длина ответа: {vuln.get('content_length', 'N/A')}")
+                report_lines.append(f"Уверенность: {vuln.get('confidence', 'Неизвестно')}")
+                report_lines.append(f"Доказательства: {vuln.get('evidence', 'Нет')}")
                 report_lines.append("")
         else:
             report_lines.append("Уязвимости не найдены")
@@ -2037,25 +1990,25 @@ class SimpleIDORBruteforceScanner:
         report_lines.append("")
         report_lines.append("Рекомендации по устранению IDOR")
         report_lines.append("-" * 80)
-        report_lines.append("1. ЗАЩИТА ОТ ПЕРЕБОРА:")
-        report_lines.append("   • Используйте CAPTCHA для подозрительных запросов")
-        report_lines.append("   • Добавьте задержки между попытками доступа")
-        report_lines.append("   • Блокируйте IP-адреса после множества неудачных попыток")
+        report_lines.append("1.Защита от перебора:")
+        report_lines.append("Используйте CAPTCHA для подозрительных запросов")
+        report_lines.append("Добавьте задержки между попытками доступа")
+        report_lines.append("Блокируйте IP-адреса после множества неудачных попыток")
         report_lines.append("")
-        report_lines.append("2. БЕЗОПАСНЫЕ ИДЕНТИФИКАТОРЫ:")
-        report_lines.append("   • Минимальная длина идентификатора -16+ случайных символов")
-        report_lines.append("   • Регулярно меняйте идентификаторы сессий")
-        report_lines.append("   • Не используйте предсказуемые паттерны")
+        report_lines.append("2.Безопасные индификаторы:")
+        report_lines.append("Минимальная длина идентификатора -16+ случайных символов")
+        report_lines.append("Регулярно меняйте идентификаторы сессий")
+        report_lines.append("Не используйте предсказуемые паттерны")
         report_lines.append("")
-        report_lines.append("3. КОНТРОЛЬ ДОСТУПА:")
-        report_lines.append("   • Проверяйте права доступа для КАЖДОГО запроса")
-        report_lines.append("   • Внедрите систему RBAC (Role-Based Access Control)")
-        report_lines.append("   • Используйте токены с ограниченным сроком действия")
+        report_lines.append("3.Контроль доступа:")
+        report_lines.append("Проверяйте права доступа для КАЖДОГО запроса")
+        report_lines.append("Внедрите систему RBAC (Role-Based Access Control)")
+        report_lines.append("Используйте токены с ограниченным сроком действия")
         report_lines.append("")
-        report_lines.append("4. МОНИТОРИНГ И АУДИТ:")
-        report_lines.append("   • Настройте оповещения о подозрительной активности")
-        report_lines.append("   • Регулярно проводите тестирование на проникновение")
-        report_lines.append("   • Используйте системы обнаружения вторжений")
+        report_lines.append("4.Мониторинг и аудит:")
+        report_lines.append("Настройте оповещения о подозрительной активности")
+        report_lines.append("Регулярно проводите тестирование на проникновение")
+        report_lines.append("Используйте системы обнаружения вторжений")
         report_lines.append("")
         report_lines.append("=" * 80)
         report_lines.append("Конец отчета")
@@ -2066,17 +2019,13 @@ class SimpleIDORBruteforceScanner:
             f.write('\n'.join(report_lines))
 
         print(f"\nТекстовый отчет сохранен в файл: {filename}")
-
-        print("\n" + "=" * 60)
-        print("КРАТКИЕ РЕЗУЛЬТАТЫ:")
-        print("=" * 60)
+        print("Краткие результаты:")
         if self.vulnerabilities:
             print(f"Найдено {len(self.vulnerabilities)} уязвимостей IDOR:")
             for i, vuln in enumerate(self.vulnerabilities[:5], 1):
                 print(f"{i}. {vuln['url']}")
         else:
             print("Уязвимости не обнаружены")
-        print("=" * 60)
 
     def generate_report(self, output_file=None):
         """Генерирует отчет в обоих форматах"""
@@ -2098,12 +2047,9 @@ def main():
     parser = argparse.ArgumentParser(
         description='IDOR Bruteforce Scanner - Перебор 6-символьных комбинаций',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-  • Всего комбинаций: 62^6 = 56.8 миллиардов
-  • Полный перебор слишком долгий
-  • Используйте стратегии тестирования
-        """
-    )
+        epilog="""Всего комбинаций: 62^6 = 56.8 миллиардов
+  Полный перебор слишком долгий
+  Используйте стратегии тестирования""")
 
     parser.add_argument('url', help='Целевой URL для сканирования')
     parser.add_argument('--threads', type=int, default=20,
@@ -2142,8 +2088,8 @@ def main():
         pdf_file, txt_file = scanner.generate_report(args.output)
 
         print(f"\nОтчеты успешно созданы:")
-        print(f"    PDF отчет: {pdf_file}")
-        print(f"    Текстовый отчет: {txt_file}")
+        print(f"PDF отчет: {pdf_file}")
+        print(f"Текстовый отчет: {txt_file}")
 
     except KeyboardInterrupt:
         print("\n\nСканирование прервано пользователем")
