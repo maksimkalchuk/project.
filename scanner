@@ -2195,7 +2195,6 @@ class SimpleIDORBruteforceScanner:
 
         if self.vulnerabilities:
             report_lines.append("Найденные уязвимости IDOR")
-            report_lines.append("-" * 80)
 
             for i, vuln in enumerate(self.vulnerabilities, 1):
                 report_lines.append(f"{i}. {vuln['type']}")
@@ -2210,7 +2209,6 @@ class SimpleIDORBruteforceScanner:
             report_lines.append("Уязвимости не найдены")
             report_lines.append("")
         report_lines.append("Статистика сканирования")
-        report_lines.append("-" * 80)
         duration = time.time() - self.stats['start_time']
         report_lines.append(f"Общее время сканирования: {duration:.2f} секунд")
         report_lines.append(f"Отправлено HTTP запросов: {self.stats['requests_sent']}")
@@ -2222,7 +2220,6 @@ class SimpleIDORBruteforceScanner:
 
         report_lines.append("")
         report_lines.append("Рекомендации по устранению IDOR")
-        report_lines.append("-" * 80)
         report_lines.append("1.Защита от перебора:")
         report_lines.append("Используйте CAPTCHA для подозрительных запросов")
         report_lines.append("Добавьте задержки между попытками доступа")
