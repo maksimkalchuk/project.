@@ -27,11 +27,7 @@ except ImportError:
 
 class XSSAuditor:
     def __init__(self, target_url, max_threads=10, cookies=None, headers=None):
-        """Специализированный XSS-сканер
-        target_url (str): Целевой URL для сканирования
-        max_threads (int): Максимальное количество потоков
-        cookies (dict): Куки для аутентификации
-        headers (dict): Заголовки HTTP"""
+
         self.target_url = target_url.rstrip('/')
         parsed_url = urlparse(target_url)
         self.base_domain = parsed_url.netloc
@@ -999,7 +995,7 @@ class XSSAuditor:
                         ['Метод', vuln.get('method', 'N/A')],
                         ['Код ответа', str(vuln.get('response_code', 'N/A'))],
                         ['Описание', vuln.get('description', 'Нет')],
-                        ['Пейлоад', vuln.get('payload', 'N/A')[:100]], # Обрезаем пейлоад
+                        ['Пейлоад', vuln.get('payload', 'N/A')[:100]],
                         ['Время обнаружения', vuln.get('timestamp', 'N/A')]
                     ]
                     if 'url' in vuln:
@@ -1024,14 +1020,14 @@ class XSSAuditor:
                     vuln_table = Table(vuln_table_data, colWidths=[150, 350])
                     #Цвет в зависимости от уверенности
                     if vuln.get('confidence') == 'High':
-                        header_color = colors.HexColor('#E74C3C')  # Красный
-                        row_color = colors.HexColor('#FDEDEC')  # Светло-красный
+                        header_color = colors.HexColor('#E74C3C')
+                        row_color = colors.HexColor('#FDEDEC')
                     elif vuln.get('confidence') == 'Medium':
-                        header_color = colors.HexColor('#F39C12')  # Оранжевый
-                        row_color = colors.HexColor('#FEF5E7')  # Светло-оранжевый
-                    else: # Low
-                        header_color = colors.HexColor('#3498DB')  # Синий
-                        row_color = colors.HexColor('#EBF5FB')  # Светло-синий
+                        header_color = colors.HexColor('#F39C12')
+                        row_color = colors.HexColor('#FEF5E7')
+                    else:
+                        header_color = colors.HexColor('#3498DB')
+                        row_color = colors.HexColor('#EBF5FB')
 
                     vuln_table.setStyle(TableStyle([
                         ('BACKGROUND', (0, 0), (-1, 0), header_color),
@@ -1133,7 +1129,6 @@ class XSSAuditor:
         duration = time.time() - self.stats['start_time']
         report_lines = []
         report_lines.append("Отчет об аудите XSS уязвимостей")
-        report_lines.append("=" * 80)
         report_lines.append(f"Цель: {self.target_url}")
         report_lines.append(f"Домен: {self.base_domain}")
         report_lines.append(f"Дата сканирования: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -1159,7 +1154,6 @@ class XSSAuditor:
 
         if self.vulnerabilities:
             report_lines.append("Найденные уязвимости XSS")
-            report_lines.append("-" * 80)
             for i, vuln in enumerate(self.vulnerabilities, 1):
                 report_lines.append(f"{i}. {vuln['type']}")
                 report_lines.append(f"   Уверенность: {vuln.get('confidence', 'Неизвестно')}")
@@ -1255,12 +1249,12 @@ def main():
                         help='Быстрое сканирование (меньше тестов)')
     args = parser.parse_args()
 
-    # Проверка URL
+    #Проверка URL
     if not args.url.startswith(('http://', 'https://')):
         print("Укажите полный URL")
         return
 
-    # Парсинг cookies
+    #Парсинг cookies
     cookies_dict = {}
     if args.cookies:
         for cookie in args.cookies.split(';'):
@@ -2249,9 +2243,7 @@ class SimpleIDORBruteforceScanner:
         report_lines.append("Регулярно проводите тестирование на проникновение")
         report_lines.append("Используйте системы обнаружения вторжений")
         report_lines.append("")
-        report_lines.append("=" * 80)
         report_lines.append("Конец отчета")
-        report_lines.append("=" * 80)
 
 
         with open(filename, 'w', encoding='utf-8') as f:
@@ -2325,8 +2317,6 @@ def main():
 
         vulnerabilities = scanner.scan()
         pdf_file, txt_file = scanner.generate_report(args.output)
-
-        print(f"\nОтчеты успешно созданы:")
         print(f"PDF отчет: {pdf_file}")
         print(f"Текстовый отчет: {txt_file}")
 
